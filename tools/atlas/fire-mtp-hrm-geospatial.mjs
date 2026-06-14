@@ -9,13 +9,27 @@
 //   GNN  = L0 EdgeLevelGNN :4792 (LIVE service) edge scores on the pipes (summary embedded from the live fire)
 //   geometry source = liris's verified preExistenceNode (cross-checked bad_coords=0 on acer)
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 
-const LIB = 'C:/asolaria-asi-on-metal-fabric/tools/falcon/omni-acer/lib';
-const NN  = 'C:/asolaria-as-neural-network/tools/behcs/pre-existence-graph-exporter.mjs';
-const FEED = 'D:/PID-Registration-Office/fabric-feed/supervisors-fabric-feed-2026-06-10.hbp';
+// portable resolution (liris caught the hardcoded-acer-path bug): repo-local first,
+// then env override, then known clone locations. byte-pinned Falcon libs untouched.
+const HERE = dirname(fileURLToPath(import.meta.url));
+const firstExisting = (cands, what) => {
+  for (const c of cands) if (c && existsSync(c)) return c;
+  throw new Error(`cannot locate ${what} — set the env override; tried: ${cands.filter(Boolean).join(' , ')}`);
+};
+const LIB = firstExisting([process.env.ASOLARIA_OMNI_LIB, resolve(HERE, '../falcon/omni-acer/lib'),
+  'C:/asolaria-asi-on-metal-fabric/tools/falcon/omni-acer/lib'], 'omni-acer/lib');
+const NN = firstExisting([process.env.ASOLARIA_NN_EXPORTER,
+  'C:/asolaria-as-neural-network/tools/behcs/pre-existence-graph-exporter.mjs',
+  'C:/Users/rayss/ASOLARIA-AS-NEURAL-NETWORK/tools/behcs/pre-existence-graph-exporter.mjs',
+  resolve(HERE, '../../../asolaria-as-neural-network/tools/behcs/pre-existence-graph-exporter.mjs')],
+  'pre-existence-graph-exporter.mjs (the NN repo coordinate engine)');
+const FEED = firstExisting([process.env.ASOLARIA_OFFICE_FEED,
+  'D:/PID-Registration-Office/fabric-feed/supervisors-fabric-feed-2026-06-10.hbp'],
+  'office feed (acer-side; set ASOLARIA_OFFICE_FEED to verify elsewhere)');
 const OUT  = resolve('reports/acer-mtp-hrm-geospatial.html');
 
 const { mtpHeads, measureHitRate } = await import(pathToFileURL(LIB + '/mtp-heads.mjs').href);

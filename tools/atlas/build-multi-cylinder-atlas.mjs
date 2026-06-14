@@ -16,15 +16,27 @@
 // HONEST (rendered in header): coords REAL · NO true Hilbert d2xyz curve (linear index
 // folded mod-6) · GNN watch LIVE but proposal-not-proof · live process telemetry NOT claimed.
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 
-const FEED = process.argv[2] || 'D:/PID-Registration-Office/fabric-feed/supervisors-fabric-feed-2026-06-10.hbp';
+// portable resolution (liris caught the hardcoded-acer-path bug): env override, then known clones.
+const HERE = dirname(fileURLToPath(import.meta.url));
+const firstExisting = (cands, what) => {
+  for (const c of cands) if (c && existsSync(c)) return c;
+  throw new Error(`cannot locate ${what} — set the env override; tried: ${cands.filter(Boolean).join(' , ')}`);
+};
+const FEED = process.argv[2] || firstExisting([process.env.ASOLARIA_OFFICE_FEED,
+  'D:/PID-Registration-Office/fabric-feed/supervisors-fabric-feed-2026-06-10.hbp'],
+  'office feed (acer-side; set ASOLARIA_OFFICE_FEED to verify elsewhere)');
 const OUT  = process.argv[3] || resolve('reports/acer-multi-cylinder-atlas.html');
-const NN   = 'C:/asolaria-as-neural-network/tools/behcs/pre-existence-graph-exporter.mjs';
+const NN   = firstExisting([process.env.ASOLARIA_NN_EXPORTER,
+  'C:/asolaria-as-neural-network/tools/behcs/pre-existence-graph-exporter.mjs',
+  'C:/Users/rayss/ASOLARIA-AS-NEURAL-NETWORK/tools/behcs/pre-existence-graph-exporter.mjs',
+  resolve(HERE, '../../../asolaria-as-neural-network/tools/behcs/pre-existence-graph-exporter.mjs')],
+  'pre-existence-graph-exporter.mjs (the NN repo coordinate engine)');
 
-// ---- import liris's VERIFIED coordinate engine (cross-repo, absolute) ---------------
+// ---- import liris's VERIFIED coordinate engine (cross-repo, portable) ---------------
 const prex = await import(pathToFileURL(NN).href);
 const { preExistenceNode, PRIME_CUBE_PRIMES, PRIME_CUBES, WATCHER_LANES } = prex;
 
