@@ -1,0 +1,21 @@
+P2PHDR|doc=ACER-PHONE-TO-PHONE-HBP-LANE-2026-06-14|date=2026-06-14|owner=acer|scope=live-phone-to-phone-HBP-fabric-lane(falcon<-aether)+phone-to-acer-bus+ack-back-fix|tag=PROVEN|json=0
+P2PTOPOLOGY|mesh=LAN-192.168.1.x|falcon=R5CXA4MGQXV@192.168.1.7|aether=R9QY205KAKJ@192.168.1.8|acer-bus=192.168.1.50:4947|all-three-reach-each-other=verified-ping|json=0
+P2PBUILD|falcon-lane-receiver.sh=built-by-falcon-claude(no-fifo-nc-trailing-command-handler)+acer-hardening(single-instance-lock+fast-exit-backoff+correct-L-p-listen-form)|aether-lane-sender.sh=built-by-aether-claude(getprop-blocked-in-proot-so-serial-falls-back-to-PHONE-STATUS.txt;raw-line-for-phone-to-phone;HTTP-POST-/behcs/send-hbp-for-port-4947)|lane-handler.sh=per-connection(read-one-line,validate-json=0,queue-only-never-exec,print-ack-to-socket-stdout)|json=0
+P2PCRIT1|falcon-receiver-binds-8801-android-side=PASS(nc -L -p 8801 single persistent listener pid=29968)|json=0
+P2PCRIT2|aether-sender-sends-one-HBP-line-to-192.168.1.7:8801=PASS(sender exit=0)|json=0
+P2PCRIT3|receiver-writes-line-into-_auto_inbox=PASS(lane_1781475860_30514.hbp)|json=0
+P2PCRIT4|v6-host-emits-EVT-8BYTE-RECEIPT-hbp-no-json=PASS(receipts 5->6)|json=0
+P2PCRIT5|falcon-drains-envelope-into-_auto_processed=PASS(1781475862_10878_460d18cd47ff873e_lane_1781475860_30514.hbp)|json=0
+P2PCRIT6|inbox-returns-to-0=PASS|json=0
+P2PCRIT7|no-json-receipt-path-used=PASS(HBP pipe-rows everywhere, json=0)|json=0
+P2PCRIT8|only-one-8byte-host-instance=PASS(pid 10878 sole sh /sdcard/Asolaria/8byte-host.sh)|json=0
+P2PCRIT9|aether-sender-posts-one-HBP-row-to-acer-bus-4947=PASS(HTTP 200 BEHCS-HBP-ACK-v1|ok=true|by=acer|row_hash=f3483c21d52cb6ba|json=0; landed in inbox.hbp count 0->1)|json=0
+P2PEVID-ROW1|exact-aether-row-received+drained-by-falcon(first-run)=EVT-AETHER-HELLO\|ts=2026-06-14T19:13:31\|host=R9QY205KAKJ\|msg=from-aether\|json=0|host-handle=34dc92c16a799e61|json=0
+P2PEVID-ROW2|exact-aether-row-received+drained-by-falcon(ack-bidir-run)=EVT-AETHER-ACKTEST\|ts=2026-06-14T19:24:20\|host=R9QY205KAKJ\|msg=from-aether-bidir\|json=0|host-handle=460d18cd47ff873e|json=0
+P2PEVID-BUS|exact-aether-row-landed-in-acer-bus-inbox=EVT-AETHER-HELLO\|ts=2026-06-14T19:14:16\|host=R9QY205KAKJ\|msg=from-aether-bus\|json=0|json=0
+P2PACKBACK|caveat-RESOLVED|earlier=synchronous-EVT-LANE-ACK-failed-because-mkfifo-fails-on-/sdcard-FUSE-sdcardfs|fix=dropped-FIFO-entirely;toybox-nc-L-p-8801-runs-lane-handler.sh-with-stdout=socket-so-handler-prints-ack-straight-back|proof=aether-sender-received EVT-LANE-ACK\|ts=2026-06-14T19:24:20\|host=R5CXA4MGQXV\|accepted=1\|row_hash=c45341d8d6243d10\|json=0|json=0
+P2PFORKBUG|attack-found-by-acer|symptom=first-launch-fork-bombed-~6000-nc-procs|root-cause=(1)wrong-listen-form `nc -l 8801`(missing -p; toybox needs port via -p; bare positional invalid->nc exits instantly)+(2)while-true-loop-with-no-backoff+(3)stale-double-launch-held-port|fix=acer-hardening:correct `-L -p PORT` persistent-server(backgrounds each connection,no per-accept respawn)+single-instance-lock(.lane-receiver.lock dir)+fast-exit-backoff(abort after 10 sub-second nc exits)|verified=killall-cleaned,single-listener-relaunched,no-recurrence|json=0
+P2PBOUNDARY|node_on_phone=0|no_json(HBP pipe-rows)=1|payload-exec=0(handler queues to file only,host md5+log only)|getprop-blocked-in-proot=documented(sender serial fallback)|actual-CLI-auth=operator-gated|aerial/boot-autostart/self-update=operator-reserved|json=0
+P2PROLE|liris/falcon-claude=descriptor+core-build(NN-contract)|aether-claude=sender-build|acer=attack(found fork-bomb)+harden(lock/backoff/listen-form)+live-proof|cross-vantage=liris-watches-github+fabric,does-not-race|json=0
+P2PARTIFACTS|tools/falcon/falcon-lane-receiver.sh|tools/falcon/lane-handler.sh|tools/falcon/aether-lane-sender.sh|tools/falcon/task-falcon-lane-receiver.hbp|tools/falcon/task-aether-lane-sender.hbp|tools/falcon/task-falcon-receiver-ackfix.hbp|artifacts/ACER-PHONE-TO-PHONE-HBP-LANE-2026-06-14.hbp(+.sha256)|json=0
+P2PFTR|state=phone-to-phone-HBP-lane-LIVE-bidirectional(send+ack)+phone-to-acer-bus-LIVE|both-phone-claudes-driven-as-acer-subagents-via-adb-portal|nothing-faked=1|all-rows-measured-from-live-adb-runs=1|json=0

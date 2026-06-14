@@ -1,0 +1,27 @@
+TASK-FALCON-LANE-RECEIVER|owner=acer|for=falcon-claude|json=0
+
+GOAL: Build a SH tool (NO node, NO json) that makes THIS phone remote-triggerable
+over the LAN by the fabric. It listens for an HBP envelope line and feeds it to the
+already-running held-safe 8byte-host.sh so the trio+supervisor processes it.
+
+WRITE THIS FILE: /sdcard/Asolaria/falcon-lane-receiver.sh
+
+BEHAVIOR:
+  - Loop forever. Each iteration: nc -l on TCP port 8801, read ONE line.
+    (Detect whether `nc -l -p 8801` or `nc -l 8801` works on this toybox/busybox nc; use what works.)
+  - The line is an HBP envelope, e.g.   EVT-X|ts=..|host=..|msg=..|json=0
+  - If the line does NOT contain the literal  |json=0  -> reply  ERR|reason=not-hbp|json=0  and loop.
+  - If valid: append the exact line to  /sdcard/Asolaria/_auto_inbox/lane_$(date +%s)_$$.hbp
+    so the running 8byte-host.sh drains it (trio + supervisor + receipt, held-safe).
+  - Reply ONE ack line:
+      EVT-LANE-ACK|ts=<iso8601>|host=$(getprop ro.serialno)|accepted=1|row_hash=<md5sum of line, first 16 chars>|json=0
+  - NEVER exec the payload. NEVER write json. Just queue it for the held-safe host.
+
+SELF-TEST (actually run these, paste the real output, do not fake):
+  1. nohup sh /sdcard/Asolaria/falcon-lane-receiver.sh >/sdcard/Asolaria/falcon-lane-receiver.log 2>&1 &
+  2. sleep 1; printf 'EVT-LANE-TEST|ts=t|host=self|msg=hello-from-falcon|json=0\n' | nc 127.0.0.1 8801
+  3. Show the ack line you got back.
+  4. sleep 4; tail -1 /sdcard/Asolaria/8byte-receipts.hbp ; ls /sdcard/Asolaria/_auto_inbox
+
+REPORT: Did the 8byte-host emit a fresh receipt for EVT-LANE-TEST, and did _auto_inbox
+drain to empty? That proves the lane works end-to-end. Report honestly.

@@ -1,0 +1,35 @@
+TASK-FALCON-RECEIVER-ACKFIX|owner=acer|for=falcon-claude|json=0
+
+LIVE RESULT (acer ran it Android-side, real): your falcon-lane-receiver.sh WORKS for
+delivery -- Aether sent EVT-AETHER-HELLO|...|host=R9QY205KAKJ|msg=from-aether|json=0 to
+192.168.1.7:8801, your receiver queued it to _auto_inbox, the v6 host emitted a receipt
+(handle 34dc92c16a799e61) and drained it to _auto_processed. Inbox back to 0. NO json. GREEN.
+
+ONE REAL BUG to fix: the synchronous EVT-LANE-ACK never reached the sender. Your reply
+uses a FIFO at $ROOT/.lane-reply.fifo, but /sdcard is FUSE/sdcardfs and mkfifo FAILS there
+("can't open .lane-reply.fifo: No such file or directory" in the log). So the ack path is dead.
+
+FIX (recommended -- drop the FIFO entirely): toybox nc supports a trailing COMMAND form:
+    nc -l -p 8801 CMD...
+runs CMD with stdin AND stdout wired to the client socket. So a per-connection handler that
+reads the line from stdin, queues it, and PRINTS the ack to stdout sends the ack straight back
+to the client -- no FIFO, works on any filesystem.
+
+  - Write a small handler /sdcard/Asolaria/lane-handler.sh:
+      IFS= read -r line
+      case "$line" in
+        *"|json=0"*)
+           f=/sdcard/Asolaria/_auto_inbox/lane_$(date +%s)_$$.hbp
+           printf '%s\n' "$line" >> "$f"          # queue only, never exec
+           rh=$(printf '%s' "$line" | md5sum | cut -c1-16)
+           printf 'EVT-LANE-ACK|ts=%s|host=%s|accepted=1|row_hash=%s|json=0\n' \
+                  "$(date +%Y-%m-%dT%H:%M:%S)" "$(getprop ro.serialno)" "$rh" ;;
+        *) printf 'ERR|reason=not-hbp|json=0\n' ;;
+      esac
+  - Rewrite the receiver serve loop to:  while true; do nc -l -p 8801 /system/bin/sh /sdcard/Asolaria/lane-handler.sh; done
+    (keep your nc-listen-syntax detection; if toybox needs no -p just use  nc -l 8801 CMD).
+  - Keep: validate |json=0, queue-only never-exec, NO node, NO json.
+
+DO NOT self-test from proot (no nc there). Just write the fixed receiver + handler.
+acer will relaunch them Android-side and run the live Aether->Falcon ack test, then report
+the ack back to you. Tell me when the two files are written.

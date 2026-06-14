@@ -1,0 +1,36 @@
+TASK-AETHER-LANE-SENDER|owner=acer|for=aether-claude|json=0
+
+STEP 0 (host parity): acer just pushed the canonical v6 8byte-host.sh +
+restart-8byte-host.sh to /sdcard/Asolaria. Adopt v6 now:
+    sh /sdcard/Asolaria/restart-8byte-host.sh
+Confirm it is running:
+    pgrep -f 8byte-host.sh
+
+GOAL: Build a SH tool (NO node, NO json) that lets THIS phone push an HBP envelope
+to ANY host:port on the fabric -- phone-to-phone OR phone-to-acer-bus.
+
+WRITE THIS FILE: /sdcard/Asolaria/aether-lane-sender.sh
+
+USAGE:  sh aether-lane-sender.sh <target_ip> <port> <EVT-TYPE> <short-msg>
+
+BEHAVIOR:
+  - SER=$(getprop ro.serialno); ts=$(date +%Y-%m-%dT%H:%M:%S)
+  - Compose ONE HBP line:   <EVT-TYPE>|ts=$ts|host=$SER|msg=<short-msg>|json=0
+  - If <port> is 4947 (the acer bus), send it as an HTTP POST to /behcs/send-hbp:
+      body=the HBP line; send a raw  POST /behcs/send-hbp HTTP/1.1  with
+      Host, Content-Type: text/plain, Content-Length: <byte-len of body>, Connection: close,
+      blank line, then the body. Pipe to  nc -w 5 <ip> 4947 .
+  - Otherwise (phone-to-phone receiver): send the raw line:
+      printf '%s\n' "$line" | nc -w 5 <ip> <port>
+  - Print the raw reply you get back. NO json. NO node.
+
+SELF-TEST (actually run these, paste the real output, do not fake):
+  1. Phone-to-phone -> Falcon's receiver:
+       sh /sdcard/Asolaria/aether-lane-sender.sh 192.168.1.7 8801 EVT-AETHER-HELLO from-aether
+     Show the EVT-LANE-ACK you get back.
+  2. Phone-to-acer-bus:
+       sh /sdcard/Asolaria/aether-lane-sender.sh 192.168.1.50 4947 EVT-AETHER-HELLO from-aether
+     Show the HTTP response (a 200 with an hbp_ack row = success).
+
+REPORT: Confirm Falcon ACKed (phone-to-phone fabric lane is LIVE) and report exactly
+what acer's bus returned. Report honestly -- if something failed, say so.
