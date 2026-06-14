@@ -1,11 +1,11 @@
 #!/system/bin/sh
-# 8byte-host-watchdog.sh v4 - crash-resilience + OMNICODER app (icon + home-screen, HBP-not-JSON, no node).
+# 8byte-host-watchdog.sh v5 - keeps host + omnicoder nc UI-servers(4781,8789) alive + writes omnicoder.html app. NO node.
 ROOT=/sdcard/Asolaria; STATUS=$ROOT/PHONE-STATUS.txt; HTML=$ROOT/omnicoder.html
 SER=$(getprop ro.serialno 2>/dev/null)
-echo "$(date +%Y-%m-%dT%H:%M:%S) WATCHDOG v4 + OMNICODER-APP start ser=$SER" >> "$ROOT/8byte-watchdog.log"
+echo "$(date +%Y-%m-%dT%H:%M:%S) WATCHDOG v5 (host+ncservers+omnicoder-app) start ser=$SER" >> "$ROOT/8byte-watchdog.log"
 while true; do
-  if ! pgrep -f 8byte-host.sh >/dev/null 2>&1; then nohup sh "$ROOT/8byte-host.sh" >/dev/null 2>&1 &
-    echo "$(date +%Y-%m-%dT%H:%M:%S) respawned 8byte-host" >> "$ROOT/8byte-watchdog.log"; fi
+  pgrep -f 8byte-host.sh >/dev/null 2>&1 || nohup sh "$ROOT/8byte-host.sh" >/dev/null 2>&1 &
+  for P in 4781 8789; do pgrep -f "omnicoder-ncserver.sh $P" >/dev/null 2>&1 || nohup sh "$ROOT/omnicoder-ncserver.sh" $P >/dev/null 2>&1 & done
   HPID=$(pgrep -f 8byte-host.sh | head -1); WPID=$(pgrep -f 8byte-host-watchdog.sh | head -1)
   INBOX=$(ls "$ROOT/_auto_inbox" 2>/dev/null | wc -l); RECV=$(cat "$ROOT/8byte-receipts.ndjson" 2>/dev/null | wc -l)
   TS=$(date +%Y-%m-%dT%H:%M:%S); R1=$(tail -n 1 "$ROOT/8byte-receipts.ndjson" 2>/dev/null)
@@ -13,7 +13,7 @@ while true; do
   S1=$(tail -n 1 "$ROOT/8byte-supervisor.ndjson" 2>/dev/null)
   RE=$(echo "$S1" | sed -n 's/.*"real":"\([^"]*\)".*/\1/p'); RF=$(echo "$S1" | sed -n 's/.*"self_reflect":"\([^"]*\)".*/\1/p')
   FA=$(echo "$S1" | sed -n 's/.*"ask_fabric":"\([^"]*\)".*/\1/p'); P0=$(echo "$S1" | sed -n 's/.*"fabric_pid0":"\([^"]*\)".*/\1/p')
-  { echo "ASOLARIA OMNICODER device=$SER updated=$TS host=$HPID wd=$WPID inbox=$INBOX receipts=$RECV last=$LH trio=$RE/$RF/$FA pid0=$P0"; } > "$STATUS" 2>/dev/null
+  echo "ASOLARIA OMNICODER ser=$SER updated=$TS host=$HPID wd=$WPID inbox=$INBOX receipts=$RECV last=$LH" > "$STATUS" 2>/dev/null
   cat > "$HTML" <<HEOF
 <!doctype html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta http-equiv=refresh content=5>
 <title>Asolaria</title><link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOTIiIGhlaWdodD0iMTkyIj48cmVjdCB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgcng9IjQyIiBmaWxsPSIjMDUwNzBhIi8+PHJlY3QgeD0iMTIiIHk9IjEyIiB3aWR0aD0iMTY4IiBoZWlnaHQ9IjE2OCIgcng9IjM0IiBmaWxsPSJub25lIiBzdHJva2U9IiMzN0UyRDUiIHN0cm9rZS13aWR0aD0iNSIvPjx0ZXh0IHg9Ijk2IiB5PSIxMjQiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIGZvbnQtc2l6ZT0iMTEwIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iIzM3RTJENSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QTwvdGV4dD48Y2lyY2xlIGN4PSIxNTAiIGN5PSIxNTAiIHI9IjEwIiBmaWxsPSIjN0NGQzlBIi8+PC9zdmc+"><link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOTIiIGhlaWdodD0iMTkyIj48cmVjdCB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgcng9IjQyIiBmaWxsPSIjMDUwNzBhIi8+PHJlY3QgeD0iMTIiIHk9IjEyIiB3aWR0aD0iMTY4IiBoZWlnaHQ9IjE2OCIgcng9IjM0IiBmaWxsPSJub25lIiBzdHJva2U9IiMzN0UyRDUiIHN0cm9rZS13aWR0aD0iNSIvPjx0ZXh0IHg9Ijk2IiB5PSIxMjQiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIGZvbnQtc2l6ZT0iMTEwIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iIzM3RTJENSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QTwvdGV4dD48Y2lyY2xlIGN4PSIxNTAiIGN5PSIxNTAiIHI9IjEwIiBmaWxsPSIjN0NGQzlBIi8+PC9zdmc+">
