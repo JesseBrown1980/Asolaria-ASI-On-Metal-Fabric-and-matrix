@@ -1,0 +1,23 @@
+# HARD-BLOCK large binaries — frozen-brain weights are 5-6GB and must NEVER enter git.
+# Transport is recipe + sha identity (see README); bytes travel by re-download or physical USB.
+*.gguf
+*.bin
+*.onnx
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+*.ab
+*.iso
+*.img
+*.zip
+*.7z
+*.tar
+*.tar.gz
+*.tgz
+# raw sector dumps (can be huge / contain raw device bytes)
+*.rawsector
+*.dd
+# python noise
+__pycache__/
+*.pyc
