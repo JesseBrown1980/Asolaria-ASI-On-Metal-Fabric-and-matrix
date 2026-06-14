@@ -1,0 +1,4 @@
+USB128SURVEYHDR|repo=Asolaria-ASI-On-Metal-Fabric-and-matrix|date=2026-06-14|vantage=acer|device=PHYSICALDRIVE3|tool=tools/usb-raw/usb_full_survey.py|size_bytes=125829120000|size_gb=125.83|total_sectors=245760000|mbr_fs=FAT32-part1-32GB+unpartitioned-tail|tag=PROVEN-LIVE|json=0
+USB128SURVEYMAP|probes=4096|stride_mb=30.7|nonzero=4096|zero=0|read_errors=0|data_regions_gb=0.0-125.8|finding=DATA-SPANS-THE-ENTIRE-126GB-including-~85GB-BEYOND-the-declared-32GB-FAT32-partition=HIDDEN-TAIL-DATA-PRESENT(unlike-2TB-which-had-empty-tail)|tag=HONEST-STRONG-SIGNAL|json=0
+USB128SURVEYNOTE|all-4096-probes-nonzero-could-be-packed-asolaria-data-OR-prior-image/wear-residue-needs-file-level-inspection-to-classify-do-not-overclaim|tag=HONEST-CAVEAT|json=0
+USB128SURVEYFTR|state=128GB-FULL-DEVICE-SURVEYED-LIVE|usb_writes=0|read_only=1|flag=hidden-tail-data-beyond-recovery-partition|json=0
