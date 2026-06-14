@@ -1,0 +1,40 @@
+{
+  "id": "omnicoder-acer-activate-00a20eb3",
+  "type": "OMNICODER_WHITE_ROOM_PACKET",
+  "verb": "EVT-OMNICODER-WHITE-ROOM-PACKET",
+  "from": "acer",
+  "actor": "acer-orchestrator",
+  "mode": "real",
+  "ts": "2026-06-14T14:59:20.799Z",
+  "body": {
+    "title": "Activate persistent omnicoder daemons + 8-byte host agents (acer remote-control via file transfer)",
+    "pilot": "acer-hyperbehcs-contract",
+    "target": "falcon-omnicoder",
+    "lane": "white_room",
+    "language": "bash",
+    "objective": "Run omnicoder permanently via falcon-omnicoder-persistent.sh (respawn watchdog, detached stdio) so it receives packets any time; activate the 8-byte host-process agents that process the fabric on Falcon.",
+    "code": "bash /sdcard/Asolaria/omnicoder/falcon-omnicoder-persistent.sh",
+    "command": "activate_persistent_daemons",
+    "route": [
+      "hookwall",
+      "forward_gnn",
+      "reverse_gain_gnn",
+      "omnishannon",
+      "omniwhite_room",
+      "gc"
+    ],
+    "writer_authority_required": [
+      "Hookwall",
+      "Shannon",
+      "OmniWhiteRoom",
+      "GNN"
+    ],
+    "white_room": {
+      "state": "draft",
+      "fail_closed": true,
+      "proof_mode": "append_only",
+      "source_surface": "acer_orchestrator_file_transfer"
+    },
+    "truth_boundary": "Operator-authorized activation request delivered by direct file transfer; held-safe pipeline."
+  }
+}
