@@ -1,0 +1,7 @@
+OMNICONNHDR|canon=asolaria-as-neural-network|date=2026-06-14|topic=omnidirectional-phone-to-phone-connectors|run-via=8-byte-sh-host(NOT-node)+omnicoder+omniscrcpy|rule-of-three=shadow+stealth+frontend|tag=PROVEN-NEWER|json=0
+OMNICONNMESH|nodes=acer+liris+aether+falcon(beast-not-yet)|topology=OMNIDIRECTIONAL-every-node-to-every-node|relay=acer-hub-now-USB+aerial-LAN-later|json=0
+OMNICONNSHADOW|v=shadow|behavior=silent-relay-no-visible-trace|3line=read-msg->route-to-peer-inbox->no-log|host=8byte-sh|json=0
+OMNICONNSTEALTH|v=stealth|behavior=low-profile-relay-minimal-footprint|3line=read->route->tiny-receipt|host=8byte-sh|json=0
+OMNICONNFRONTEND|v=frontend|behavior=visible-relay+omniscrcpy-screen-receipt|3line=read->route->visible-handle|host=8byte-sh|json=0
+OMNICONNRUN|via=8-byte-host-processes-sh-md5-handle-NOT-node|omnicoder=message-surface|omniscrcpy=visual-lane|held-safe=receive+relay+receipt-no-exec|json=0
+OMNICONNFTR|state=three-version-connectors-defined+run-via-8byte-hosts|p2p=via-acer-relay-now|next=aerial-LAN-direct+beast|json=0
