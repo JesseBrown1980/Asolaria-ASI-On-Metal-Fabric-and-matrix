@@ -1,0 +1,7 @@
+USB128HDR|repo=Asolaria-ASI-On-Metal-Fabric-and-matrix|date=2026-06-14|vantage=acer|device=PHYSICALDRIVE3|disk=VendorCo-ProductCode-117GB-USB(nominal-128GB)|tool=tools/usb-raw/usb_raw_io.py|method=raw-block-read-LIVE|tag=PROVEN-LIVE-READ|json=0
+USB128MBR|lba=0|boot_sig=0x55aa|valid=1|sha16=f24aad075a280a08|sha256=f24aad075a280a085def984dab3d5ac4a78fffa3f02c9b22398bf6d7b06cd1b1|boot_code=present-x86-bootstrap-33c08ed0bc007c8e|json=0
+USB128PART|idx=1|boot=0x80-ACTIVE-bootable|type=0x0C|type_label=FAT32-LBA|lba_start=2048|lba_size=67108864|bytes=34359738368|gb=32|json=0
+USB128PART|idx=2-3-4|type=0x00|state=EMPTY-in-MBR-table|json=0
+USB128FINDING|presents_as=bootable-32GB-FAT32-volume-RECUPERACAO+~85GB-unpartitioned-tail|HONEST_FLAG=this-reads-as-WINDOWS-RECOVERY-USB(per-memory-2026-04-30)-NOT-an-asolaria-data-volume|if_intended_as_asolaria_carrier=operator-confirm-repurpose(reformat=HARD-DENY-needs-apex)|tag=HONEST-CONTRADICTION-SURFACED|json=0
+USB128NEXT|liris-gets-same-device-agnostic-tools(--device-flag)|reads-this-USB-read-only|compare-via-matrix-sector-sha-chain|tag=PROVEN-PROTOCOL|json=0
+USB128FTR|state=128GB-USB-MBR-ATTESTED-LIVE-FROM-ACER|usb_writes=0|read_only=1|flag=verify-intent-recovery-vs-data-before-physical-move|json=0

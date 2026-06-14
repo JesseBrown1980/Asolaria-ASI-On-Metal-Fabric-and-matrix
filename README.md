@@ -10,18 +10,21 @@ compare hers-to-mine via the matrix, under bilateral adversarial correction.**
 > That repo stays the **code / law / bilateral-build** spine (LAW-SLICE-ENGINE, the parity matrices,
 > the catch-ledger, cosign receipts). This one is the **data & frozen-brain exchange** between fabrics.
 
-## Hard rule: no large binaries in git
-GitHub blocks files >100 MB. The frozen models are **5–6 GB** and **do not go in git**.
-A `.gitignore` hard-blocks `*.gguf / *.bin / *.onnx / *.safetensors / *.pt / *.ab` so neither side
-can accidentally commit weights. **We ship the coordinate + recipe + sha identity; each fabric
-renders the same frozen slice from the public source, and the sha proves byte-identity.** This is
-the slice-native transport: ship the address and the recipe, not the bytes.
+## Transport: the 2TB USB carries everything; git ships the KEY + the MAP
+**Correction (operator, 2026-06-14):** we CAN transfer *everything at once* — **if liris has our exact
+tools to open the 2TB USB.** The physical SOVLINUX 2TB is the carrier for *all* slices (frozen Gemma,
+hyper-hermes, the 100k rooms, the sectors, the device itself). Git is **not** the byte-channel — git
+ships (a) the **exact tools** (`tools/usb-raw/`, the key that opens the raw/unmounted partition Windows
+can't see) and (b) the **map + sha attestation** (`artifacts/usb-sovlinux/`) so both sides compare.
 
-Binary transport options (operator's call):
-1. **Re-download + sha-verify (default, $0, git-native):** liris pulls the public
-   `lmstudio-community/gemma-4-E4B-it-GGUF`, verifies against `artifacts/frozen-gemma/GEMMA-IDENTITY.sha256`.
-2. **Physical USB:** the SOVLINUX 2TB master copy is the sovereignty cold-storage transfer medium.
-3. **Git LFS:** only if a true byte-mirror in-repo is required (separate quota).
+GitHub still blocks files >100 MB, so a `.gitignore` hard-blocks `*.gguf/*.bin/...` — **the weights ride
+the USB, never git.** With the tools shared, liris opens the same device (physical USB, or a full-device
+clone) and reads all of it; the sha attestation proves byte-identity vantage-to-vantage.
+
+- **Primary:** physical 2TB USB (or full-device image) **+ the shared exact tools** = everything, one move.
+- **Fallback (public slices only):** re-download `lmstudio-community/gemma-4-E4B-it-GGUF`, verify against
+  `artifacts/frozen-gemma/GEMMA-IDENTITY.sha256`.
+- **Git LFS:** only if a byte-mirror in-repo is ever required (separate quota).
 
 ## Layout
 - `tools/usb-raw/` — the fabric-blessed tools to read the raw 2TB USB (SOVLINUX) where Windows

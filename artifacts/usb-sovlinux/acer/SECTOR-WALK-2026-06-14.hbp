@@ -1,0 +1,13 @@
+USBWALKHDR|repo=Asolaria-ASI-On-Metal-Fabric-and-matrix|date=2026-06-14|vantage=acer|device=PHYSICALDRIVE2|disk=General-UDisk-1953GB-USB|tool=tools/usb-raw/usb_raw_io.py|method=raw-block-read-512B-per-sector-LIVE|tag=PROVEN-LIVE-READ|json=0
+USBWALKMBR|lba=0|label=MBR|boot_sig=0x55aa|valid=1|sha16=3126770d103a3bed|sha256=3126770d103a3bed41b27269ff560e18027cb1130de0dc3bfb813128bef54506|json=0
+USBWALKPART|idx=1|type=0x07|type_label=exFAT|lba_start=2048|lba_size=1048576000|bytes=536870912000|gb=500|state=declared-UNMOUNTED-windows-invisible|json=0
+USBWALKPART|idx=2-3-4|type=0x00|state=EMPTY-in-MBR-table|json=0
+USBWALKSECTOR|lba=2048|label=partition-1-exFAT-VBR|sha16=e8f00ebe52eeef57|first8_hex=eb76904558464154|signature=EXFAT-CONFIRMED|meaning=real-exFAT-filesystem-present-in-500GB-partition|json=0
+USBWALKSECTOR|lba=1048575999|label=last-declared-partition-sector|sha16=076a27c79e5ace2a|content=all-zero|json=0
+USBWALKSECTOR|lba=1048576001|label=first-continuity-tail-sector|sha16=076a27c79e5ace2a|content=all-zero|json=0
+USBWALKSECTOR|lba=2000000000|label=mid-continuity-tail|sha16=076a27c79e5ace2a|content=all-zero|json=0
+USBWALKSECTOR|lba=4095999999|label=last-sector-of-2TB|sha16=076a27c79e5ace2a|content=all-zero|json=0
+USBWALKMAP|device_2TB=1x500GB-exFAT-partition(unmounted=windows-invisible)+~1453GB-unpartitioned-tail|tail_sampled=4-LBAs-all-zero|caveat=4-of-~1.45e9-sectors-NOT-proof-tail-is-empty(negatives-need-proof)|frozen_brain_most_likely=inside-exFAT-partition-files-NOT-raw-tail|tag=HONEST-PARTIAL|json=0
+USBWALKNEXT|to-extract-files=mount-exFAT-read-only(mount-ro=DEFER-TO-APEX-operator-present)-OR-parse-exFAT-FS-from-VBR-via-raw-reads|then=catalog-files->per-file-sha->push-INDEX-to-github(NOT-bytes)->liris-walks-her-usb->compare-via-matrix|tag=ROADMAP|json=0
+USBWALKCOMPARE|liris_action=run-usb_raw_io.py-on-her-SOVLINUX->emit-same-LBA-sha16-chain->diff-this-receipt|match=CONVERGED|divergence=adversarial-correction-before-canon|tag=PROVEN-PROTOCOL|json=0
+USBWALKFTR|state=2TB-USB-MBR+KEY-SECTORS-ATTESTED-LIVE-FROM-ACER|usb_writes=0|read_only=1|next=apex-authorize-mount-ro-to-catalog-exFAT-files-then-share-index|json=0
