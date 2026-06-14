@@ -1,0 +1,11 @@
+SOVROOMMAPHDR|repo=Asolaria-ASI-On-Metal-Fabric-and-matrix|date=2026-06-14|vantage=acer|source=google-drive:sovlinux-root-directory-contents-2026-05-22.hbp(decoded-this-session)|verified_via=sanctioned-raw-IO-cluster-7-LBA-38144-of-exFAT-volume|cosign=quintuple-seq-191|first_sector_sha256=13324ac28e11178af9d307dcada014effa871972c0b42a88ed0dbab16598afc6|tag=PROVEN-FROM-DRIVE-CATALOG|json=0
+SOVROOMMAP|2TB-exFAT-root=13-entries(10-dirs+3-files)|recovered-WITHOUT-mounting-the-device|json=0
+SOVROOMMAPDIR|name=sovereignty|cluster=11|role=ASOLARIA-VAULT-HOME-LX-495-E-then-F-sovereignty|priority=DEEP-READ-TARGET|json=0
+SOVROOMMAPDIR|name=data|cluster=1424|role=federation-data-folder-LARGE-likely-CANONICAL-STATE|priority=DEEP-READ-TARGET|json=0
+SOVROOMMAPDIR|name=C-colon|literal=C:|cluster=116|role=full-C-drive-shaped-archive-subtree|json=0
+SOVROOMMAPDIR|name=4x-A06-de-FELIPE-full-usb-copy-20260401(172156/172202/172314/172436)|role=Felipe-4-snapshots-of-full-USB-state-2026-04-01|json=0
+SOVROOMMAPDIR|name=adb-test-pull+System_Volume_Information|json=0
+SOVROOMMAPFILE|name=copy_felipe_a06_storage.ps1|cluster=25627|bytes=1614|role=the-copy-orchestrator-recipe|json=0
+SOVROOMMAPFINDING|frozen-gemma/hyper-hermes/mcp-NOT-at-root|they-live-DEEPER-inside-sovereignty(cluster-11)-or-data(cluster-1424)|root-walk-was-1-level-only|tag=HONEST-NEXT|json=0
+SOVROOMMAPNEXT|deep-read=exFAT-FS-walk-from-cluster-11+1424-via-usb_raw_io(read-only)-OR-mount-ro(apex-authorized-2026-06-14)|then-catalog-the-vault+data-subtrees->push-index|tag=ROADMAP|json=0
+SOVROOMMAPFTR|state=2TB-ROOM-MAP-RECOVERED-FROM-DRIVE|liris-rehydration-index-ready|usb_writes=0|read_only=1|json=0
