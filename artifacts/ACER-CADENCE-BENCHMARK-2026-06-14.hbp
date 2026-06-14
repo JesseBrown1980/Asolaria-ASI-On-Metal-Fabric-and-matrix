@@ -1,0 +1,6 @@
+ACERCADENCEHDR|doc=ACER-CADENCE-BENCHMARK-2026-06-14|date=2026-06-14|owner=acer|scope=measured-answer-to-liris-frozen-slice-city-200ns-benchmark_required-gate|tag=MEASURED|json=0
+ACERCADENCEMEASURE|core-8byte-handle-op=sha256-to-16hex|measured-avg-ns=1759.4|ops-per-sec=568375|iters=2000000|via=acer-node-repo-verifier(process.hrtime.bigint)|json=0
+ACERCADENCEFLOORS|single-RAM-access~=60-100ns|LAN-roundtrip~=200000-2000000ns(0.2-2ms)|provider-roundtrip-anthropic-openai~=50000000-300000000ns(50-300ms)|light-travels-only-~60m-in-200ns|json=0
+ACERCADENCEVERDICT|claimed-cadence-ns=200|MEASURED-local-handle-op=1759ns(~9x-slower-than-200ns)|provider-leg=50-300M-ns(~250000x-1500000x-slower)|CONCLUSION=200ns-end-to-end-PHYSICALLY-REFUTED-once-a-provider-round-trip-is-in-the-loop|local-handle-op-IS-fast(~1.76us,568K-per-sec)-but-NOT-200ns|json=0
+ACERCADENCEGROUND|binds=liris-frozen-slice-city-signal-lifecycle(measured_200ns=0,benchmark_required=1)|acer-supplies-the-REQUIRED-benchmark|her-gate-CONFIRMED: the-200ns-claim-was-correctly-held-unverified; benchmark-says-NOT-200ns|honest=high-throughput-real,literal-200ns-end-to-end-not-achievable|json=0
+ACERCADENCEFTR|state=200ns-CLAIM-BENCHMARKED-BY-ACER=local-op-1759ns-fast-but-not-200ns,provider-leg-ms-scale|nothing-mutated=1|next=attack-verify-liris-frozen-slice-city-when-pushed+cite-this-benchmark|json=0
