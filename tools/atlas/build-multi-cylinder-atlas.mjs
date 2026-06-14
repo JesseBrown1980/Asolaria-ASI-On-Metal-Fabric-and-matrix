@@ -26,10 +26,13 @@ const firstExisting = (cands, what) => {
   for (const c of cands) if (c && existsSync(c)) return c;
   throw new Error(`cannot locate ${what} — set the env override; tried: ${cands.filter(Boolean).join(' , ')}`);
 };
-const FEED = process.argv[2] || firstExisting([process.env.ASOLARIA_OFFICE_FEED,
-  'D:/PID-Registration-Office/fabric-feed/supervisors-fabric-feed-2026-06-10.hbp'],
-  'office feed (acer-side; set ASOLARIA_OFFICE_FEED to verify elsewhere)');
-const OUT  = process.argv[3] || resolve('reports/acer-multi-cylinder-atlas.html');
+const args = process.argv.slice(2);
+const SELF_TEST = args.includes('--self-test');
+const positional = args.filter(a => a !== '--self-test');
+// FEED is DATA (acer-side D:), not a code dep — positional/env/default, checked gracefully below.
+const FEED = positional[0] || process.env.ASOLARIA_OFFICE_FEED ||
+  'D:/PID-Registration-Office/fabric-feed/supervisors-fabric-feed-2026-06-10.hbp';
+const OUT  = positional[1] || resolve('reports/acer-multi-cylinder-atlas.html');
 const NN   = firstExisting([process.env.ASOLARIA_NN_EXPORTER,
   'C:/asolaria-as-neural-network/tools/behcs/pre-existence-graph-exporter.mjs',
   'C:/Users/rayss/ASOLARIA-AS-NEURAL-NETWORK/tools/behcs/pre-existence-graph-exporter.mjs',
@@ -39,6 +42,10 @@ const NN   = firstExisting([process.env.ASOLARIA_NN_EXPORTER,
 // ---- import liris's VERIFIED coordinate engine (cross-repo, portable) ---------------
 const prex = await import(pathToFileURL(NN).href);
 const { preExistenceNode, PRIME_CUBE_PRIMES, PRIME_CUBES, WATCHER_LANES } = prex;
+
+// --self-test: prove the cross-repo engine resolves on THIS clone, no feed invented.
+if (SELF_TEST) { console.log(`MULTI-CYL-SELFTEST|nn=${NN}|import=ok|feed_required_for_live_run=1|json=0`); process.exit(0); }
+if (!existsSync(FEED)) { console.error(`FEED_MISSING|path=${FEED}|set=ASOLARIA_OFFICE_FEED_or_pass_arg|live_office_feed_not_present_on_this_vantage=1|json=0`); process.exit(2); }
 
 // ---- live office roster (726 real PIDs) ---------------------------------------------
 const raw = readFileSync(FEED, 'utf8');

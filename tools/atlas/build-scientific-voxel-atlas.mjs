@@ -16,11 +16,19 @@
 //   phase    = hilbert mod 6                 -- the zeta mod-6 fold (marker)
 //   lane     = system-type {real|logical|frozen}  -- the rule-of-three division (PAST PTP)
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 
-const FEED = process.argv[2] || 'D:/PID-Registration-Office/fabric-feed/supervisors-fabric-feed-2026-06-10.hbp';
-const OUT  = process.argv[3] || resolve('reports/acer-scientific-voxel-atlas.html');
+// portable (liris cross-vantage catch): FEED is acer-side DATA — positional/env/default, gated below.
+const args = process.argv.slice(2);
+const SELF_TEST = args.includes('--self-test');
+const positional = args.filter(a => a !== '--self-test');
+const FEED = positional[0] || process.env.ASOLARIA_OFFICE_FEED ||
+  'D:/PID-Registration-Office/fabric-feed/supervisors-fabric-feed-2026-06-10.hbp';
+const OUT  = positional[1] || resolve('reports/acer-scientific-voxel-atlas.html');
+
+if (SELF_TEST) { console.log(`SCIENTIFIC-VOXEL-SELFTEST|feed_required_for_live_run=1|default_out=${OUT}|json=0`); process.exit(0); }
+if (!existsSync(FEED)) { console.error(`FEED_MISSING|path=${FEED}|set=ASOLARIA_OFFICE_FEED_or_pass_arg|live_office_feed_not_present_on_this_vantage=1|json=0`); process.exit(2); }
 
 // ---- parse the feed (HBP pipe-rows) -------------------------------------------------
 const raw = readFileSync(FEED, 'utf8');

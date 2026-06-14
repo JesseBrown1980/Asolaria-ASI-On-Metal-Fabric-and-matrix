@@ -27,15 +27,20 @@ const NN = firstExisting([process.env.ASOLARIA_NN_EXPORTER,
   'C:/Users/rayss/ASOLARIA-AS-NEURAL-NETWORK/tools/behcs/pre-existence-graph-exporter.mjs',
   resolve(HERE, '../../../asolaria-as-neural-network/tools/behcs/pre-existence-graph-exporter.mjs')],
   'pre-existence-graph-exporter.mjs (the NN repo coordinate engine)');
-const FEED = firstExisting([process.env.ASOLARIA_OFFICE_FEED,
-  'D:/PID-Registration-Office/fabric-feed/supervisors-fabric-feed-2026-06-10.hbp'],
-  'office feed (acer-side; set ASOLARIA_OFFICE_FEED to verify elsewhere)');
+// FEED is DATA (acer-side D:), not a code dep — default + env override, checked gracefully below.
+const SELF_TEST = process.argv.slice(2).includes('--self-test');
+const FEED = process.env.ASOLARIA_OFFICE_FEED ||
+  'D:/PID-Registration-Office/fabric-feed/supervisors-fabric-feed-2026-06-10.hbp';
 const OUT  = resolve('reports/acer-mtp-hrm-geospatial.html');
 
 const { mtpHeads, measureHitRate } = await import(pathToFileURL(LIB + '/mtp-heads.mjs').href);
 const { hrmShapedPrediction, slowLoopPredictShape, SHAPES } = await import(pathToFileURL(LIB + '/hrm-slow-fast.mjs').href);
 const { hilbertDecode } = await import(pathToFileURL(LIB + '/hilbert.mjs').href);
 const { preExistenceNode } = await import(pathToFileURL(NN).href);
+
+// --self-test: prove imports + cross-repo engine resolve on THIS clone, no feed invented.
+if (SELF_TEST) { console.log(`ATLAS-MTP-HRM-SELFTEST|lib=${LIB}|nn=${NN}|imports=ok|feed_required_for_live_run=1|json=0`); process.exit(0); }
+if (!existsSync(FEED)) { console.error(`FEED_MISSING|path=${FEED}|set=ASOLARIA_OFFICE_FEED_or_pass_arg|live_office_feed_not_present_on_this_vantage=1|json=0`); process.exit(2); }
 
 const cpToBhCoord = (cp) => hilbertDecode(Math.max(0, Math.min(4095, cp)), { dimensions: 3, bits: 4 });
 
