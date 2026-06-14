@@ -1,0 +1,7 @@
+ACERPHONEHOSTFIX|doc=ACER-PHONE-HOST-LOOP-FIX-2026-06-14|owner=rayss|scope=fix-wedged-phone-8byte-sh-host-loop-after-19b11c9|tag=PROVEN|json=0
+ACERPHONEHOSTFIXFABRIC|ask=council-q-1781470601674-qmxdbq|row_hash=4be3fd62c29dc982|verdict=ACK-UNSIGNED|json=0
+ACERPHONEHOSTFIXROOT|bug=v5-host-name-diff-initialized-seen-from-inbox-on-each-start+did-not-drain-inbox|effect=respawn-race-can-mark-fresh-HBI-drops-seen-and-stress-test-saw-0-HBP-receipts|json=0
+ACERPHONEHOSTFIXPATCH|host=tools/falcon/8byte-host.sh|version=v6-BOSS|change=restart-safe-queue-drain+process-visible-and-hidden-files+emit-HBP-only+move-processed-to-_auto_processed+single-instance-lock|json=0
+ACERPHONEHOSTFIXRESTART|helper=tools/falcon/restart-8byte-host.sh|scope=kill-only-/sdcard/Asolaria/8byte-host.sh-clear-lock-start-host|avoids=broad-pkill-8byte-host-that-can-hit-watchdog|json=0
+ACERPHONEHOSTFIXVERIFY|syntax=8byte-host.sh+restart-8byte-host.sh|local-one-shot=2-HBI-files-including-hidden->2-receipts+2-supervisor+inbox0+processed2|node_on_phone=0|json=0
+ACERPHONEHOSTFIXBOUNDARY|phone-live-redeploy=not-proven-from-rayss|next=acer-or-liris-push-files-to-phone-run-restart-helper-then-repeat-60-envelope-stress|json=0
