@@ -2,7 +2,7 @@
 # 8byte-host-watchdog.sh v9 - OMNICODER = Odysseus agent-control front-end (10 honest matrices + map3d bh_index band). NO node.
 ROOT=/sdcard/Asolaria; STATUS=$ROOT/PHONE-STATUS.txt; HTML=$ROOT/omnicoder.html
 SER=$(getprop ro.serialno 2>/dev/null)
-echo "$(date +%Y-%m-%dT%H:%M:%S) WATCHDOG v9 (odysseus matrix front-end) start ser=$SER" >> "$ROOT/8byte-watchdog.log"
+echo "$(date +%Y-%m-%dT%H:%M:%S) WATCHDOG v10 (M/T/P corrected to PARTIAL) start ser=$SER" >> "$ROOT/8byte-watchdog.log"
 while true; do
   pgrep -f 8byte-host.sh >/dev/null 2>&1 || nohup sh "$ROOT/8byte-host.sh" >/dev/null 2>&1 &
   for P in 4781 8789; do pgrep -f "omnicoder-ncserver.sh $P" >/dev/null 2>&1 || nohup sh "$ROOT/omnicoder-ncserver.sh" $P >/dev/null 2>&1 & done
@@ -15,7 +15,7 @@ while true; do
 <title>Asolaria</title><link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOTIiIGhlaWdodD0iMTkyIj48cmVjdCB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgcng9IjQyIiBmaWxsPSIjMDUwNzBhIi8+PHJlY3QgeD0iMTIiIHk9IjEyIiB3aWR0aD0iMTY4IiBoZWlnaHQ9IjE2OCIgcng9IjM0IiBmaWxsPSJub25lIiBzdHJva2U9IiMzN0UyRDUiIHN0cm9rZS13aWR0aD0iNSIvPjx0ZXh0IHg9Ijk2IiB5PSIxMjQiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIGZvbnQtc2l6ZT0iMTEwIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iIzM3RTJENSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QTwvdGV4dD48Y2lyY2xlIGN4PSIxNTAiIGN5PSIxNTAiIHI9IjEwIiBmaWxsPSIjN0NGQzlBIi8+PC9zdmc+"><link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOTIiIGhlaWdodD0iMTkyIj48cmVjdCB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgcng9IjQyIiBmaWxsPSIjMDUwNzBhIi8+PHJlY3QgeD0iMTIiIHk9IjEyIiB3aWR0aD0iMTY4IiBoZWlnaHQ9IjE2OCIgcng9IjM0IiBmaWxsPSJub25lIiBzdHJva2U9IiMzN0UyRDUiIHN0cm9rZS13aWR0aD0iNSIvPjx0ZXh0IHg9Ijk2IiB5PSIxMjQiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIGZvbnQtc2l6ZT0iMTEwIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iIzM3RTJENSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QTwvdGV4dD48Y2lyY2xlIGN4PSIxNTAiIGN5PSIxNTAiIHI9IjEwIiBmaWxsPSIjN0NGQzlBIi8+PC9zdmc+"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Asolaria"><meta name="theme-color" content="#05070a">
 <style>html,body{background:#05070a;color:#7CFC9A;font-family:ui-monospace,monospace;margin:0;padding:0}#top{padding:8px;height:46vh;overflow:auto;box-sizing:border-box}h1{color:#37E2D5;font-size:13px;letter-spacing:1px;margin:0 0 4px;display:flex;align-items:center;gap:7px}h1 img{width:22px;height:22px}.b{color:#9aa;font-size:9px;margin:5px 0 3px;letter-spacing:1px}.m{font-size:10px;padding:3px 6px;margin:2px 0;border-left:3px solid #444;background:#0a0f15;word-break:break-all}.ok{border-left-color:#7CFC9A;color:#bdf0c8}.part{border-left-color:#ffd166;color:#ffe6a3}.cant{border-left-color:#ff6b6b;color:#ffb3b3}.r{background:#0c1118;border-left:3px solid #37E2D5;padding:4px 6px;margin:3px 0;font-size:10px}.k{color:#37E2D5;font-weight:700}#c{display:block;width:100%;height:52vh;background:#04060a;border-top:2px solid #37E2D5}</style></head><body>
 <div id=top><h1><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOTIiIGhlaWdodD0iMTkyIj48cmVjdCB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgcng9IjQyIiBmaWxsPSIjMDUwNzBhIi8+PHJlY3QgeD0iMTIiIHk9IjEyIiB3aWR0aD0iMTY4IiBoZWlnaHQ9IjE2OCIgcng9IjM0IiBmaWxsPSJub25lIiBzdHJva2U9IiMzN0UyRDUiIHN0cm9rZS13aWR0aD0iNSIvPjx0ZXh0IHg9Ijk2IiB5PSIxMjQiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIGZvbnQtc2l6ZT0iMTEwIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iIzM3RTJENSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QTwvdGV4dD48Y2lyY2xlIGN4PSIxNTAiIGN5PSIxNTAiIHI9IjEwIiBmaWxsPSIjN0NGQzlBIi8+PC9zdmc+">ASOLARIA &middot; OMNICODER &middot; Odysseus agent-control surface</h1>
-<div class=b>MATRICES (every cell = route/file/sha or CANNOT-SEE) &middot; agent work-surface &middot; actions operator-gated</div>
+<div class=b>MATRICES v10 (6 PROVEN-LIVE / 4 PARTIAL / 0 CANNOT-SEE) &middot; agent work-surface &middot; actions operator-gated</div>
 <div class="m ok">C council_vote | /api/council/query+/verdicts +:4953 cosign | PROVEN-LIVE</div>
 <div class="m ok">R memory_index | /api/canon-index + /api/manifest + CLAIMSLEDGER | PROVEN-LIVE</div>
 <div class="m ok">E local_engine | /api/everything + engine-census (7 files hashed) | PROVEN-LIVE</div>
@@ -23,9 +23,9 @@ while true; do
 <div class="m ok">G gate_state | cosign-authority + GATECLASS + LAW-CLASS1 seq3564 | PROVEN</div>
 <div class="m ok">D dashboard_parity | DASHBOARD-RESOLVER-PARITY (6 baselines byte-sealed) | PROVEN</div>
 <div class="m part">Q swarm_queue | tools/behcs/answer-producer.mjs (19/19) ; /api/loop/pending flaky | PARTIAL</div>
-<div class="m cant">M model_selector | CANNOT-SEE | no model-registry; gemma frozen-slice socket EMPTY (0 bytes) | NEW_ARTIFACT</div>
-<div class="m cant">T tool_skill | CANNOT-SEE | no fabric tool/skill registry (harness-side only) | NEW_ARTIFACT</div>
-<div class="m cant">P project_guide | CANNOT-SEE | only the 200-step plan exists | NEW_ARTIFACT</div>
+<div class="m part">M model_selector | tools/behcs/model-selector-matrix.mjs | PARTIAL artifact-built, live-model GATED</div>
+<div class="m part">T tool_skill | tools/behcs/tool-skill-registry-matrix.mjs | PARTIAL artifact-built, live-tool-exec GATED</div>
+<div class="m part">P project_guide | tools/behcs/project-guide-matrix.mjs | PARTIAL artifact-built, workflow-binding GATED</div>
 <div class=r><span class=k>LIVE</span> |ser=$SER|host_pid=$HPID|inbox=$INBOX|receipts=$RECV|last=$LH|updated=$TS|json=0</div>
 <div class=b>MAP3D-BAND &middot; real bh_index cylinders by agent-type lane (below)</div></div>
 <canvas id=c></canvas>
