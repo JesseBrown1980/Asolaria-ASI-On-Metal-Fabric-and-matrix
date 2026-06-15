@@ -1,0 +1,56 @@
+TASK-FALCON-OMNICODER-REMOTE-TRIGGER|owner=acer|for=falcon-claude|json=0
+
+CONTEXT: the live lane works (aether/acer -> falcon :8801 -> lane-handler.sh -> queue ->
+v6 host receipt -> drain; ack returns). omnicoder.html is the agent-control surface but its
+data is a STALE static snapshot (receipts=4982, updated 2026-06-14T17:22:43, hardcoded H[]).
+GOAL: make the omnicoder REMOTE-TRIGGERABLE over the lane so acer can fire one HBP line and
+the surface regenerates from CURRENT live fabric state. NO node. NO json (HBP rows). HELD-SAFE.
+
+BUILD TWO THINGS:
+
+1) /sdcard/Asolaria/omnicoder-render.sh  -- regenerate the surface from LIVE local state.
+   - Read ONLY local fabric files (never the network, never any remote input):
+       receipts = wc -l < /sdcard/Asolaria/8byte-receipts.hbp
+       inbox    = count of files in /sdcard/Asolaria/_auto_inbox
+       ser      = getprop ro.serialno   (works Android-side)
+       host_pid = pgrep -f /sdcard/Asolaria/8byte-host.sh | head -1
+       last     = handle8 of the newest receipt row
+       handles  = the handle8= field from the LATEST 60 receipt rows (real recent traffic),
+                  NOT the hardcoded array. (grep/sed out  handle8=XXXX  -> 16-hex tokens.)
+       updated  = date +%Y-%m-%dT%H:%M:%S
+   - Approach: make /sdcard/Asolaria/omnicoder.template.html = a copy of the CURRENT
+     omnicoder.html with the dynamic bits replaced by tokens:
+       @@RECEIPTS@@ @@INBOX@@ @@SER@@ @@HOST_PID@@ @@LAST@@ @@UPDATED@@  and the JS
+       array line  var H=[ ... ];  replaced by  var H=[@@HANDLES@@];
+     Then omnicoder-render.sh builds @@HANDLES@@ as  "h1","h2",...  from the live handles and
+     seds every token into a freshly-written /sdcard/Asolaria/omnicoder.html.
+   - Keep the WHOLE existing UI intact (matrices, LIVE line, the bh_index cylinder canvas);
+     only the data changes. Preserve the meta refresh and the canvas script verbatim.
+   - Log one HBP audit row to /sdcard/Asolaria/omnicoder/omnicoder-render.hbp:
+       EVT-OMNICODER-RENDER|ts=..|host=$ser|receipts=..|inbox=..|handles=..|json=0
+
+2) extend /sdcard/Asolaria/lane-handler.sh into a HELD-SAFE verb dispatcher.
+   The handler reads ONE line from stdin (the socket) as today. Then:
+     case "$line" in
+       "EVT-OMNICODER-REFRESH|"* )
+           # WHITELISTED verb. Run the FIXED local render script -- NEVER exec the payload.
+           sh /sdcard/Asolaria/omnicoder-render.sh >/dev/null 2>&1
+           rc=$(wc -l < /sdcard/Asolaria/8byte-receipts.hbp); ib=$(ls /sdcard/Asolaria/_auto_inbox 2>/dev/null | wc -l)
+           printf 'EVT-OMNICODER-ACK|ts=%s|host=%s|refreshed=1|receipts=%s|inbox=%s|json=0\n' "$(date +%Y-%m-%dT%H:%M:%S)" "$(getprop ro.serialno)" "$rc" "$ib" ;;
+       *"|json=0"* )
+           # unchanged: queue-only, never exec, then EVT-LANE-ACK (keep current behavior EXACTLY) ;;
+       * ) printf 'ERR|reason=not-hbp|json=0\n' ;;
+     esac
+   CRITICAL: the EVT-OMNICODER-REFRESH case must be matched BEFORE the generic *|json=0* case
+   (the refresh line also contains |json=0). The remote payload is NEVER passed to sh/eval --
+   only the fixed-path render script runs. Everything else keeps working (the committed
+   phone-to-phone lane must NOT regress).
+
+SECURITY/HELD-SAFE (must hold): only the one whitelisted verb triggers an action; the action
+is a fixed local read-and-rewrite (no payload-derived command, no eval, no network); render
+reads local state only; any real agent-control action stays operator-gated. node=0, json=0.
+
+DO NOT self-test from proot (no nc there). Write the three files (omnicoder-render.sh,
+omnicoder.template.html, updated lane-handler.sh). Tell me when done and note any design
+decision you made. acer will fire EVT-OMNICODER-REFRESH over the lane and verify the surface
+regenerates with live counts, then report back.
