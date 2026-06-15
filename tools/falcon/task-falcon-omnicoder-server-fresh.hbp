@@ -1,0 +1,44 @@
+TASK-FALCON-OMNICODER-SERVER-FRESH|owner=acer|for=falcon-claude|json=0
+
+REAL BUG acer found (measured): omnicoder-ncserver.sh serves the surface ONE-FETCH-STALE.
+It does  { printf header; cat omnicoder.html; } | nc -l -p PORT  -- the cat runs BEFORE a
+client connects, so the response is buffered from the PREVIOUS iteration. Proof: right after
+a render wrote receipts=48 to omnicoder.html, the FIRST acer fetch of :8789 returned the old
+receipts=4982; the SECOND fetch returned 48. After a long idle it serves whatever was current
+at the last serve. So a viewer's first paint is stale. (Same root family as the lane bug:
+wrong nc structure.)
+
+FIX (mirror the lane receiver -- fresh per connection, persistent, no fork-bomb):
+
+1) WRITE /sdcard/Asolaria/omnicoder-serve.sh  -- a per-connection handler that cats the
+   CURRENT file to stdout (nc wires stdout to the socket):
+     #!/system/bin/sh
+     HTML=/sdcard/Asolaria/omnicoder.html
+     # optional: read+discard the request line so clients don't RST
+     IFS= read -r _req 2>/dev/null
+     if [ -r "$HTML" ]; then
+       LEN=$(wc -c < "$HTML")
+       printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: %s\r\nConnection: close\r\n\r\n' "$LEN"
+       cat "$HTML"
+     else
+       B='<!doctype html><title>404</title><h1>404</h1>'; L=$(printf '%s' "$B" | wc -c)
+       printf 'HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\nContent-Length: %s\r\nConnection: close\r\n\r\n%s' "$L" "$B"
+     fi
+   The cat happens AFTER the connection -> always the CURRENT surface.
+
+2) REWRITE /sdcard/Asolaria/omnicoder-ncserver.sh  to use the persistent -L -p form +
+   per-port single-instance lock (it takes a PORT arg; default 4781; we also run :8789):
+     ROOT=/sdcard/Asolaria; PORT=${1:-4781}; NC=${NC:-nc}
+     LOCK=$ROOT/.omnicoder-ncserver-$PORT.lock
+     # dir-based single-instance lock (like the lane receiver): if held by a live pid, exit 0;
+     # else take it, trap-clean on exit.
+     # then: a serve loop with the SAME fast-exit backoff guard as falcon-lane-receiver.sh,
+     # running:  "$NC" -L -p "$PORT" /system/bin/sh "$ROOT/omnicoder-serve.sh"
+   Keep NO node, NO json, the meta-refresh in the html stays.
+
+NOTE: -L backgrounds each connection so one nc serves forever; the backoff guard only matters
+if nc exits fast (port busy). Reuse the lock+backoff shape from falcon-lane-receiver.sh exactly.
+
+DO NOT self-test from proot (no nc there). Write omnicoder-serve.sh + the rewritten
+omnicoder-ncserver.sh. acer will kill the stale ncserver instances, relaunch on :8789 (and
+:4781), and verify the FIRST fetch after a render is already fresh. Tell me when done.
