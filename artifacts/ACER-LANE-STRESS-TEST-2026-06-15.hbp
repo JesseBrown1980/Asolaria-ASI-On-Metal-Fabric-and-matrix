@@ -1,0 +1,6 @@
+STRESSHDR|doc=ACER-LANE-STRESS-TEST-2026-06-15|date=2026-06-15|owner=acer|scope=load-test-of-the-falcon-:8801-lane+omnicoder-dispatcher(proves-fork-bomb-hardening-holds)|tag=PROVEN|json=0
+STRESSRUN|driver=acer-powershell-TcpClient|fired=45-rapid-connections(40 EVT-STRESS lane-envelopes + 5 EVT-OMNICODER-REFRESH interleaved every 9th)|target=192.168.1.7:8801|elapsed=10037ms|rate=4.5/s|json=0
+STRESSACKS|result=45/45-acked-correctly|lane_acks=40(EVT-LANE-ACK)|omni_acks=5(EVT-OMNICODER-ACK)|errors=0|json=0
+STRESSFALCON|receipts=8->48(EXACTLY +40 = every stress envelope queued+processed+receipted; the 5 refreshes correctly produced 0 receipts as control verbs)|nc-L-listeners=1(unchanged)|leaked-transient-nc-procs=0|hosts=1(unchanged)|inbox=0(fully-drained)|json=0
+STRESSOMNI|omnicoder.html-is-a-live-point-in-time-snapshot:showed receipts=27 at the last in-stream refresh (host still draining), settled to receipts=48 on a final refresh (EVT-OMNICODER-ACK ts=2026-06-15T07:09:35 refreshed=1 receipts=48)|surface-tracks-live-state=confirmed|json=0
+STRESSCONCLUSION|the -L -p persistent-server + single-instance-lock + fast-exit-backoff hardening HOLDS under load|no-fork-bomb|no-proc-leak|held-safe-preserved(payload-never-exec)|node=0|json=0|all-rows-measured-from-live-runs=1|json=0
