@@ -16,6 +16,11 @@ Built under the **ANTI-DEFLATION COUNT LAW** (canon in the reductions repo `cano
 
 The system boots the **USB kernel (SOVLINUX) → Linux → Ubuntu → WSL** and runs on top of it. This is why drive letters move, the old recovery-USB `E:` is unmounted, and the stale scheduled task `AsolariaConnectionVaultMonitor` (`node.exe E:\sovereignty\src\connectionVaultMonitor.js`) throws MODULE_NOT_FOUND — `E:` is gone and the file relocated to `C:\Users\acer\Asolaria\sovereignty\src\`. That task is an **un-retired Windows-node pipe** (pipe-modernization target), not a real loss.
 
+## v1.2 — second L6 ledger + apex ladder
+
+- **L6 premade substrate now carries TWO ledgers (never summed):** the **100,000,000,000** packet-run registry **+** a **10,000,000,000 human-PID** premade registry (PID addressing for every human on the planet, addressing to spare). Both are address-capacity, not live agents.
+- **Apex / operator ladder:** `00` SPECIAL-OP-JESSE · `01` OP-JESSE · `02` OP-RAYSSA · `03` OP-FELIPE · `04` OP-DAN · `05` OP-AMY (the 5 OPs = the quintuple cosign signers) · **APEX-HUMAN-JESSE = HUMAN-1** (real-human apex).
+
 ## Tooling + honest boundary
 
 Read via the Asolaria **usb-raw toolkit** (`tools/usb-raw/usb_raw_io.py`, `usb_full_survey.py`, `substrate-sector-walk.ps1`, `verify-2tb-sector0.ps1`) — Windows FS layer cannot read the exFAT-drift / continuity tail. **Read-only; nothing written or cranked (E=0).** USB raw writes (format/repartition) = HARD-DENY; Drive uploads = operator-auth-gated; the secret-key carve-out remains the one held invariant.
