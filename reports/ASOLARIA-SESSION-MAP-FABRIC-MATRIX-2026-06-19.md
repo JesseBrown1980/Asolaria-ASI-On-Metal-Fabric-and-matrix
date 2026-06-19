@@ -89,3 +89,6 @@ No secret VALUES read (vault/keys = the one held carve-out). Nothing started, ki
 ---
 
 *Master index: see the reductions repo `ASOLARIA-MAP-OF-MAPS-2026-06-19.md` (in `what-is-asolaria---how-do-we-get-reductions-in-everything`) — the map-of-maps every per-repo map points back to.*
+
+---
+**Related repo:** [Algorithms-of-Asolaria](https://github.com/JesseBrown1980/Algorithms-of-Asolaria) — the canonical algorithm/formula catalog (bilateral acer↔liris). Master index: reductions `ASOLARIA-MAP-OF-MAPS-2026-06-19.md`.
