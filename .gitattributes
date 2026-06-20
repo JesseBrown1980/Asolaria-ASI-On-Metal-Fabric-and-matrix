@@ -1,3 +1,5 @@
+* -text
+
 # Linguist label fix (workflow wwauajx2c): the HTML label is generated, not authored.
 # reports/*.html = builder-emitted atlas reports (261/259/219 KB); tools/atlas/*.mjs =
 # node builders that import the engine from the NN repo (builder-here-only, not runtime);
