@@ -16,6 +16,12 @@ const BASENAME = process.env.ASOLARIA_RECALL_BASENAME || `ASOLARIA-${COLONY.toUp
 const HBP = path.join(DIR, `${BASENAME}.hbp`);
 const HBI = path.join(DIR, `${BASENAME}.hbi`);
 const SUMMARY = path.join(DIR, `SUMMARY-${COLONY.toUpperCase()}.json`);
+const USE_INVERTED_INDEX = process.env.ASOLARIA_RECALL_INVERTED_INDEX !== '0';
+const LINEAR_FALLBACK = process.env.ASOLARIA_RECALL_LINEAR_FALLBACK === '1';
+const TERM_MIN = Math.max(1, Number(process.env.ASOLARIA_RECALL_TERM_MIN || 2));
+const TERM_MAX = Math.max(TERM_MIN, Number(process.env.ASOLARIA_RECALL_TERM_MAX || 64));
+const MAX_TERMS_PER_ROW = Math.max(8, Number(process.env.ASOLARIA_RECALL_MAX_TERMS_PER_ROW || 96));
+const MAX_REFS_PER_TERM = Math.max(50, Number(process.env.ASOLARIA_RECALL_MAX_REFS_PER_TERM || 20000));
 const KEY_FILE = process.env.ASOLARIA_RECALL_KEY_FILE
   || path.join(process.env.USERPROFILE || process.env.HOME || '.', '.asolaria', 'recall.key');
 const SHARED_KEY = loadSecret();
@@ -206,19 +212,157 @@ function readIndex() {
 
 const index = readIndex();
 
+function readRowFromFd(fd, entry) {
+  if (!entry) return null;
+  const buf = Buffer.alloc(Number(entry.len));
+  fs.readSync(fd, buf, 0, buf.length, Number(entry.off));
+  return buf.toString('utf8').trimEnd();
+}
+
 function seekRow(entry) {
   if (!entry) return null;
   const fd = fs.openSync(HBP, 'r');
   try {
-    const buf = Buffer.alloc(Number(entry.len));
-    fs.readSync(fd, buf, 0, buf.length, Number(entry.off));
-    return buf.toString('utf8').trimEnd();
+    return readRowFromFd(fd, entry);
   } finally {
     fs.closeSync(fd);
   }
 }
 
-function searchLocal(rawQuery, rawLimit, maxLevel = LEVEL_OWNER_PRIVATE) {
+function tokenize(value) {
+  const text = String(value || '').toLowerCase();
+  const tokens = [];
+  const push = token => {
+    const t = String(token || '').slice(0, TERM_MAX);
+    if (t.length >= TERM_MIN) tokens.push(t);
+  };
+  const re = /[a-z0-9][a-z0-9._:-]{0,127}/g;
+  let m;
+  while ((m = re.exec(text))) {
+    const whole = m[0];
+    push(whole);
+    for (const part of whole.split(/[^a-z0-9]+/)) push(part);
+  }
+  return tokens;
+}
+
+function uniqueTokens(values, max = MAX_TERMS_PER_ROW) {
+  const out = [];
+  const seen = new Set();
+  for (const value of values) {
+    for (const token of tokenize(value)) {
+      if (seen.has(token)) continue;
+      seen.add(token);
+      out.push(token);
+      if (out.length >= max) return out;
+    }
+  }
+  return out;
+}
+
+function addPosting(terms, term, ref) {
+  let refs = terms.get(term);
+  if (!refs) {
+    refs = [];
+    terms.set(term, refs);
+  }
+  if (refs.length < MAX_REFS_PER_TERM) refs.push(ref);
+}
+
+function buildInvertedIndex(entries) {
+  const started = Date.now();
+  const terms = new Map();
+  const byPid = new Map();
+  const byBh = new Map();
+  const levelBuckets = new Map([[LEVEL_PUBLIC, []], [LEVEL_FEDERATION, []], [LEVEL_OWNER_PRIVATE, []]]);
+  let rowBytes = 0;
+  let postings = 0;
+  let truncatedTerms = 0;
+  let skippedRows = 0;
+
+  if (!USE_INVERTED_INDEX || !fs.existsSync(HBP)) {
+    return { ok: false, enabled: USE_INVERTED_INDEX, reason: 'disabled_or_missing_hbp', terms, byPid, byBh, levelBuckets };
+  }
+
+  const fd = fs.openSync(HBP, 'r');
+  try {
+    for (let i = 0; i < entries.length; i += 1) {
+      const e = entries[i];
+      let row = '';
+      try {
+        row = readRowFromFd(fd, e) || '';
+      } catch {
+        skippedRows += 1;
+      }
+      rowBytes += Buffer.byteLength(row);
+      const level = assignLevel(e.path, row);
+      e._level = level;
+      if (levelBuckets.has(level)) levelBuckets.get(level).push(i);
+      else levelBuckets.set(level, [i]);
+      if (e.pid) byPid.set(e.pid, i);
+      if (e.bh) byBh.set(String(e.bh).toLowerCase(), i);
+
+      const before = terms.size;
+      for (const term of uniqueTokens([e.pid, e.bh, e.path, row])) {
+        addPosting(terms, term, i);
+        postings += 1;
+      }
+      if (terms.size === before && row) truncatedTerms += 1;
+    }
+  } finally {
+    fs.closeSync(fd);
+  }
+
+  return {
+    ok: true,
+    enabled: true,
+    schema: 'HILBRA-IDX-BEHCS-TUPLE-TEXT-V1',
+    json_hot_path: false,
+    rows: entries.length,
+    terms: terms.size,
+    postings,
+    row_bytes_indexed: rowBytes,
+    skipped_rows: skippedRows,
+    truncated_rows: truncatedTerms,
+    built_ms: Date.now() - started,
+    byPid,
+    byBh,
+    levelBuckets,
+    termMap: terms,
+  };
+}
+
+const inverted = buildInvertedIndex(index);
+
+function intersectRefs(groups) {
+  if (!groups.length) return [];
+  groups.sort((a, b) => a.length - b.length);
+  let current = new Set(groups[0]);
+  for (const group of groups.slice(1)) {
+    const next = new Set(group);
+    current = new Set([...current].filter(x => next.has(x)));
+    if (!current.size) break;
+  }
+  return [...current].sort((a, b) => a - b);
+}
+
+function refsForQuery(rawQuery) {
+  const q = String(rawQuery || '').trim().toLowerCase();
+  if (!q) return [...Array(index.length).keys()];
+  if (inverted.byPid && inverted.byPid.has(q)) return [inverted.byPid.get(q)];
+  if (inverted.byBh && inverted.byBh.has(q)) return [inverted.byBh.get(q)];
+  const tokens = uniqueTokens([q], 16);
+  if (!tokens.length) return [];
+  const groups = [];
+  for (const token of tokens) {
+    const refs = inverted.termMap && inverted.termMap.get(token);
+    if (!refs || !refs.length) return [];
+    groups.push(refs);
+  }
+  return intersectRefs(groups);
+}
+
+function searchLocalLinear(rawQuery, rawLimit, maxLevel = LEVEL_OWNER_PRIVATE) {
   const q = String(rawQuery || '').toLowerCase();
   const limit = Math.max(1, Math.min(250, Number(rawLimit || 50)));
   const matches = [];
@@ -237,11 +381,42 @@ function searchLocal(rawQuery, rawLimit, maxLevel = LEVEL_OWNER_PRIVATE) {
     if (level > maxLevel) continue;
     matches.push({ level, index: e, row });
   }
-  return { q, count: matches.length, max_level: maxLevel, matches };
+  return { q, count: matches.length, max_level: maxLevel, mode: 'linear-scan', matches };
+}
+
+function searchLocal(rawQuery, rawLimit, maxLevel = LEVEL_OWNER_PRIVATE) {
+  if (!inverted.ok) return searchLocalLinear(rawQuery, rawLimit, maxLevel);
+  const q = String(rawQuery || '').toLowerCase();
+  const limit = Math.max(1, Math.min(250, Number(rawLimit || 50)));
+  const matches = [];
+  const refs = refsForQuery(q);
+  for (const ref of refs) {
+    if (matches.length >= limit) break;
+    const e = index[ref];
+    if (!e) continue;
+    const level = Number.isInteger(e._level) ? e._level : assignLevel(e.path, seekRow(e));
+    if (level > maxLevel) continue;
+    const row = seekRow(e);
+    matches.push({ level, index: e, row });
+  }
+  if (!matches.length && LINEAR_FALLBACK) return searchLocalLinear(rawQuery, rawLimit, maxLevel);
+  return {
+    q,
+    count: matches.length,
+    max_level: maxLevel,
+    mode: 'inverted-index',
+    index_schema: inverted.schema,
+    candidate_count: refs.length,
+    matches,
+  };
 }
 
 function seekLocal(key, maxLevel = LEVEL_OWNER_PRIVATE) {
-  const e = index.find(x => x.pid === key || x.bh === key);
+  let e = null;
+  const lowered = String(key || '').toLowerCase();
+  if (inverted.ok && inverted.byPid.has(String(key))) e = index[inverted.byPid.get(String(key))];
+  else if (inverted.ok && inverted.byBh.has(lowered)) e = index[inverted.byBh.get(lowered)];
+  else e = index.find(x => x.pid === key || x.bh === key);
   if (!e) return { found: false, index: null, row: null };
   const row = seekRow(e);
   const level = assignLevel(e.path, row);
@@ -250,6 +425,17 @@ function seekLocal(key, maxLevel = LEVEL_OWNER_PRIVATE) {
 }
 
 function randomLocal(maxLevel = LEVEL_OWNER_PRIVATE) {
+  if (inverted.ok) {
+    const refs = [];
+    for (const [level, bucket] of inverted.levelBuckets.entries()) {
+      if (level <= maxLevel) refs.push(...bucket);
+    }
+    if (!refs.length) return { found: false, index: null, row: null, max_level: maxLevel };
+    const e = index[refs[Math.floor(Math.random() * refs.length)]];
+    const row = seekRow(e);
+    const level = Number.isInteger(e._level) ? e._level : assignLevel(e.path, row);
+    return { found: true, level, max_level: maxLevel, mode: 'inverted-index-bucket', index: e, row };
+  }
   const candidates = [];
   for (const e of index) {
     const row = seekRow(e);
@@ -458,6 +644,21 @@ function publicStatus() {
       owner_private: LEVEL_OWNER_PRIVATE,
       public_search_endpoint: '/api/public/search?q=...',
       invariant: 'PII rules win before public-canon rules; level 0 is the public portal.',
+    },
+    search_index: inverted.ok ? {
+      enabled: true,
+      schema: inverted.schema,
+      json_hot_path: false,
+      rows: inverted.rows,
+      terms: inverted.terms,
+      postings: inverted.postings,
+      built_ms: inverted.built_ms,
+      skipped_rows: inverted.skipped_rows,
+      linear_fallback: LINEAR_FALLBACK,
+    } : {
+      enabled: false,
+      reason: inverted.reason || 'unavailable',
+      linear_fallback: true,
     },
     peers: PEERS.map(peer => ({ name: peer.name, base: peer.base })),
     corpus: {
