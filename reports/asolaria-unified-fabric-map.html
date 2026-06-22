@@ -73,8 +73,8 @@ svg{width:100%;height:auto;display:block;border:1px solid var(--line);border-rad
 </head>
 <body>
 <div class="wrap">
-  <div class="kick">Asolaria ASI · Operating System on Metal — Federation Topology</div>
-  <h1>Unified Fabric Map</h1>
+  <div class="kick">HILBRA · The Asolaria Fabric Internet — Federation Topology</div>
+  <h1>Hilbra — Unified Fabric Map</h1>
   <p class="sub">One expandable map of the whole federation: every colony's fabric, the crypto-keyed
   cross-fabric search that links them, and the access tiers that keep each owner's PII private while a
   public level-0 portal stays open. Click any colony to expand it. <span class="mono">Adding a colony as
@@ -101,6 +101,9 @@ svg{width:100%;height:auto;display:block;border:1px solid var(--line);border-rad
 
   <div class="section-h">Other Maps in this Atlas</div>
   <div class="maps" id="maps"></div>
+
+  <div class="section-h">Repositories <span class="small">(Hilbra · the public fabric internet — clone to join)</span></div>
+  <div class="maps" id="repos"></div>
 
   <div class="foot" id="foot"></div>
 </div>
@@ -171,6 +174,12 @@ svg{width:100%;height:auto;display:block;border:1px solid var(--line);border-rad
     {"title": "Scientific Voxel Atlas (726 PIDs)", "href": "/acer-scientific-voxel-atlas.html"},
     {"title": "Real Model (967-pt prime cylinder)", "href": "/asolaria-real-model.html"},
     {"title": "Map Index (landing)", "href": "/asolaria-map-index.html"}
+  ],
+  "repos": [
+    {"title": "Hilbra — the fabric internet (onboarding + protocol)", "href": "https://github.com/JesseBrown1980/Hilbra", "note": "founding PID 604f473ac0981dd7 — clone to join"},
+    {"title": "asolaria-federation-1024 — Rust Host-8 kernel", "href": "https://github.com/JesseBrown1980/asolaria-federation-1024", "note": "link_auth + level_tag policy core (Rust-canonical)"},
+    {"title": "Asolaria-ASI-On-Metal-Fabric-and-matrix — recall engine + maps", "href": "https://github.com/JesseBrown1980/Asolaria-ASI-On-Metal-Fabric-and-matrix", "note": "node recall engine (PR #3) · the maps · this map"},
+    {"title": "asolaria-behcs-256 — public BEHCS-256", "href": "https://github.com/JesseBrown1980/asolaria-behcs-256", "note": "discovered on LibHunt"}
   ]
 }
 </script>
@@ -321,6 +330,8 @@ svg{width:100%;height:auto;display:block;border:1px solid var(--line);border-rad
 
   // ---- maps ----
   document.getElementById('maps').innerHTML = D.maps.map(m=>`<a href="${esc(m.href)}">${esc(m.title)} ↗</a>`).join('');
+  // ---- repos ----
+  document.getElementById('repos').innerHTML = (D.repos||[]).map(r=>`<a href="${esc(r.href)}" target="_blank" rel="noopener" title="${esc(r.note||'')}">${esc(r.title)} ↗</a>`).join('');
 
   // ---- footer ----
   document.getElementById('foot').innerHTML =
