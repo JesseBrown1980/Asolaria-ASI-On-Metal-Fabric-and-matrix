@@ -66,6 +66,27 @@ GET /api/search-all?q=mcp
 That returns the local recall result plus each configured peer result. The request to each
 peer is made server-side with HMAC headers computed from the shared key.
 
+## Access Levels
+
+The engine mirrors Acer's Rust `level_tag` contract:
+
+- `0` public: carve-out-clean canon/map/update rows.
+- `5` federation: normal colony recall rows.
+- `9` owner-private: legal, customer, financial, credential, private-device, or key-adjacent rows.
+
+PII rules win before public-canon rules. A row matching private/legal/customer/key patterns is
+owner-private even if another path fragment looks public.
+
+Unauthenticated callers can use:
+
+```text
+GET /api/public/search?q=...
+```
+
+That route is hard-clamped to level `0`. Authenticated owner links can request deeper levels
+with `level=5` or `level=9`, but the server clamps the request to the grant configured for
+that owner PID.
+
 ## Browser Login
 
 The front-end can also be opened from another trusted LAN machine, for example:
@@ -87,11 +108,12 @@ trusted LAN.
 
 - `/` local UI
 - `/api/health` public node metadata; no row bodies
+- `/api/public/search?q=...` public level-0 search only
 - `/api/summary` authenticated outside loopback
-- `/api/search?q=...` authenticated outside loopback
-- `/api/search-all?q=...` authenticated outside loopback, queries configured peers
-- `/api/seek?pid=...` or `/api/seek?bh=...` authenticated outside loopback
-- `/api/random` authenticated outside loopback
+- `/api/search?q=...&level=...` authenticated outside loopback
+- `/api/search-all?q=...&level=...` authenticated outside loopback, queries configured peers
+- `/api/seek?pid=...` or `/api/seek?bh=...` authenticated outside loopback and level-filtered
+- `/api/random?level=...` authenticated outside loopback and level-filtered
 
 ## Example Launch
 

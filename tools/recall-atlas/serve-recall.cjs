@@ -19,9 +19,76 @@ const SHARED_KEY = loadSecret();
 const PEERS = parsePeers(process.env.ASOLARIA_RECALL_PEERS || '');
 const ALLOWED_OWNER_PIDS = parseCsv(process.env.ASOLARIA_RECALL_ALLOWED_OWNER_PIDS || 'OP-JESSE-PID,OP-RAYSSA-PID');
 const MAX_SKEW_S = Math.max(1, Number(process.env.ASOLARIA_RECALL_MAX_SKEW_S || 120));
+const LEVEL_PUBLIC = 0;
+const LEVEL_FEDERATION = 5;
+const LEVEL_OWNER_PRIVATE = 9;
+const LINK_GRANTS = parseGrants(process.env.ASOLARIA_RECALL_GRANTS
+  || ALLOWED_OWNER_PIDS.map(pid => `${pid}:${LEVEL_OWNER_PRIVATE}`).join(','));
+const PII_PATH_FRAGMENTS = [
+  'legal/',
+  'evidence-package',
+  'google-support-refund',
+  'support-refund-complaints',
+  'refund-complaint',
+  '/dcim/',
+  'beast-keys',
+  'decrypted-vault',
+  'charm_',
+  'private-key',
+  'recall.key',
+  '.asolaria/',
+  'credential',
+  'phone-dump',
+];
+const PII_CONTENT_FRAGMENTS = [
+  'cnpj',
+  'cpf ',
+  'paypal',
+  'zelle',
+  'refund complaint',
+  'customer care',
+  'passport no',
+  'invoice #',
+];
+const PUBLIC_CANON_PATH_FRAGMENTS = [
+  'asolaria-multi-cylinder',
+  'scientific-voxel-atlas',
+  'asolaria-real-model',
+  'agentterms-os-dashboard',
+  'asolaria-map-index',
+  'archaeology-and-significance-canon',
+  'brown-hilbert',
+  'what-is-asolaria',
+  'algorithms-of-asolaria',
+  'session-update',
+  'readme',
+];
 
 function parseCsv(raw) {
   return String(raw || '').split(',').map(x => x.trim()).filter(Boolean);
+}
+
+function clampAccessLevel(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return LEVEL_FEDERATION;
+  return Math.max(LEVEL_PUBLIC, Math.min(LEVEL_OWNER_PRIVATE, Math.trunc(n)));
+}
+
+function parseLevel(raw, fallback = LEVEL_OWNER_PRIVATE) {
+  if (raw === undefined || raw === null || raw === '') return fallback;
+  return clampAccessLevel(raw);
+}
+
+function parseGrants(raw) {
+  const grants = new Map();
+  for (const part of parseCsv(raw)) {
+    const i = part.lastIndexOf(':');
+    if (i <= 0) continue;
+    const owner = part.slice(0, i).trim();
+    if (!owner) continue;
+    grants.set(owner, clampAccessLevel(part.slice(i + 1)));
+  }
+  return grants;
 }
 
 function loadSecret() {
@@ -68,6 +135,29 @@ function safeLowerPath(value) {
   try { return decodeURIComponent(raw).toLowerCase(); } catch { return raw.toLowerCase(); }
 }
 
+function hasLongDigitRun(value) {
+  return /\d{14,}/.test(String(value || ''));
+}
+
+function isPii(pathValue, contentValue) {
+  const p = safeLowerPath(pathValue).replace(/\\/g, '/');
+  const c = String(contentValue || '').toLowerCase();
+  if (PII_PATH_FRAGMENTS.some(fragment => p.includes(fragment))) return true;
+  if (PII_CONTENT_FRAGMENTS.some(fragment => c.includes(fragment))) return true;
+  return hasLongDigitRun(contentValue);
+}
+
+function isPublicCanon(pathValue) {
+  const p = safeLowerPath(pathValue).replace(/\\/g, '/');
+  return PUBLIC_CANON_PATH_FRAGMENTS.some(fragment => p.includes(fragment));
+}
+
+function assignLevel(pathValue, contentValue) {
+  if (isPii(pathValue, contentValue)) return LEVEL_OWNER_PRIVATE;
+  if (isPublicCanon(pathValue)) return LEVEL_PUBLIC;
+  return LEVEL_FEDERATION;
+}
+
 function readIndex() {
   if (!fs.existsSync(HBI)) return [];
   return fs.readFileSync(HBI, 'utf8').split(/\r?\n/).filter(line => line.startsWith('IDX|')).map(parseParts);
@@ -87,17 +177,47 @@ function seekRow(entry) {
   }
 }
 
-function searchLocal(rawQuery, rawLimit) {
+function searchLocal(rawQuery, rawLimit, maxLevel = LEVEL_OWNER_PRIVATE) {
   const q = String(rawQuery || '').toLowerCase();
   const limit = Math.max(1, Math.min(250, Number(rawLimit || 50)));
   const matches = [];
   for (const e of index) {
     if (matches.length >= limit) break;
-    if (!q || e.pid.includes(q) || e.bh.includes(q) || safeLowerPath(e.path).includes(q)) {
-      matches.push({ index: e, row: seekRow(e) });
+    const indexHaystack = `${e.pid || ''} ${e.bh || ''} ${safeLowerPath(e.path || '')}`;
+    let row = null;
+    let hit = !q || indexHaystack.includes(q);
+    if (!hit) {
+      row = seekRow(e);
+      hit = row.toLowerCase().includes(q);
     }
+    if (!hit) continue;
+    if (!row) row = seekRow(e);
+    const level = assignLevel(e.path, row);
+    if (level > maxLevel) continue;
+    matches.push({ level, index: e, row });
   }
-  return { q, count: matches.length, matches };
+  return { q, count: matches.length, max_level: maxLevel, matches };
+}
+
+function seekLocal(key, maxLevel = LEVEL_OWNER_PRIVATE) {
+  const e = index.find(x => x.pid === key || x.bh === key);
+  if (!e) return { found: false, index: null, row: null };
+  const row = seekRow(e);
+  const level = assignLevel(e.path, row);
+  if (level > maxLevel) return { found: false, denied: true, level, max_level: maxLevel, index: null, row: null };
+  return { found: true, level, index: e, row };
+}
+
+function randomLocal(maxLevel = LEVEL_OWNER_PRIVATE) {
+  const candidates = [];
+  for (const e of index) {
+    const row = seekRow(e);
+    const level = assignLevel(e.path, row);
+    if (level <= maxLevel) candidates.push({ e, row, level });
+  }
+  if (!candidates.length) return { found: false, index: null, row: null, max_level: maxLevel };
+  const picked = candidates[Math.floor(Math.random() * candidates.length)];
+  return { found: true, level: picked.level, max_level: maxLevel, index: picked.e, row: picked.row };
 }
 
 function json(res, obj, status = 200) {
@@ -160,7 +280,7 @@ function linkHeaders(verb) {
 
 function authState(req, expectedVerb) {
   const remote = req.socket.remoteAddress || '';
-  if (isLoopback(remote)) return { ok: true, mode: 'loopback', remote };
+  if (isLoopback(remote)) return { ok: true, mode: 'loopback', remote, owner: OWNER_PID, host: COLONY };
   if (!SHARED_KEY) return { ok: false, mode: 'disabled', remote };
   const owner = String(req.headers['x-asolaria-owner-pid'] || '').trim();
   const host = String(req.headers['x-asolaria-colony'] || req.headers['x-asolaria-host'] || '').trim();
@@ -187,7 +307,7 @@ function authState(req, expectedVerb) {
 
 function requireAuth(req, res, expectedVerb) {
   const auth = authState(req, expectedVerb);
-  if (auth.ok) return true;
+  if (auth.ok) return auth;
   json(res, {
     ok: false,
     error: 'ASOLARIA_RECALL_AUTH_REQUIRED',
@@ -196,7 +316,33 @@ function requireAuth(req, res, expectedVerb) {
     auth_mode: auth.mode,
     hint: 'Send HMAC headers: X-Asolaria-Owner-PID, X-Asolaria-Colony, X-Asolaria-Verb, X-Asolaria-Nonce, X-Asolaria-TS, X-Asolaria-HMAC. Do not put keys in URLs or on the wire.',
   }, 401);
-  return false;
+  return null;
+}
+
+function grantedLevel(owner) {
+  if (!owner) return null;
+  return LINK_GRANTS.has(owner) ? LINK_GRANTS.get(owner) : null;
+}
+
+function effectiveLevel(auth, rawRequestedLevel) {
+  const requested = parseLevel(rawRequestedLevel, LEVEL_OWNER_PRIVATE);
+  if (auth.mode === 'loopback') {
+    return { ok: true, requested, max_level: requested, grant_level: LEVEL_OWNER_PRIVATE };
+  }
+  const grant = grantedLevel(auth.owner);
+  if (grant === null) return { ok: false, requested, max_level: null, grant_level: null };
+  return { ok: true, requested, max_level: Math.min(requested, grant), grant_level: grant };
+}
+
+function accessDenied(res, auth, level) {
+  return json(res, {
+    ok: false,
+    error: 'ASOLARIA_RECALL_LEVEL_DENIED',
+    colony: COLONY,
+    owner: auth.owner,
+    requested_level: level.requested,
+    grant_level: level.grant_level,
+  }, 403);
 }
 
 function requestJson(target, verb) {
@@ -228,12 +374,12 @@ function requestJson(target, verb) {
   });
 }
 
-async function searchPeers(q, limit) {
+async function searchPeers(q, limit, level) {
   if (!SHARED_KEY) {
     return PEERS.map(peer => ({ name: peer.name, base: peer.base, ok: false, error: 'shared key not configured' }));
   }
   return Promise.all(PEERS.map(async peer => {
-    const endpoint = `${peer.base}/api/search?q=${encodeURIComponent(q)}&limit=${encodeURIComponent(limit)}`;
+    const endpoint = `${peer.base}/api/search?q=${encodeURIComponent(q)}&limit=${encodeURIComponent(limit)}&level=${encodeURIComponent(level)}`;
     try {
       const result = await requestJson(endpoint, 'search');
       return { name: peer.name, base: peer.base, ok: result.status === 200, status: result.status, result: result.body };
@@ -261,8 +407,16 @@ function publicStatus() {
       key_configured: Boolean(SHARED_KEY),
       key_source: SHARED_KEY ? (process.env.ASOLARIA_RECALL_KEY ? 'env' : 'file') : 'missing',
       allowed_owner_pids: ALLOWED_OWNER_PIDS,
+      grants: Object.fromEntries(LINK_GRANTS.entries()),
       max_skew_s: MAX_SKEW_S,
       canonical_message: 'LINK|owner_pid|host|verb|nonce|ts_unix_s_be64',
+    },
+    access_levels: {
+      public: LEVEL_PUBLIC,
+      federation: LEVEL_FEDERATION,
+      owner_private: LEVEL_OWNER_PRIVATE,
+      public_search_endpoint: '/api/public/search?q=...',
+      invariant: 'PII rules win before public-canon rules; level 0 is the public portal.',
     },
     peers: PEERS.map(peer => ({ name: peer.name, base: peer.base })),
     corpus: {
@@ -314,6 +468,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:#05070a;border:1px sol
     <div class="stat"><span class="tag">text</span><br>${summary.text_extracted_rows || 0}</div>
   </div>
   <p class="small">This page serves local bytes. Remote access requires HMAC + owner PID. The engine is publishable; the HBP/HBI corpus stays private.</p>
+  <p class="small">Access levels: <span class="ok">0 public</span> · <span class="tag">5 federation</span> · <span class="warn">9 owner-private</span>. PII rules win before public-canon rules.</p>
   <p class="small">Acer's 591,286-row table remains an Acer-measured artifact until copied/cross-verified here.</p>
   <div class="auth">
     <b>Remote Colony Login</b>
@@ -327,6 +482,9 @@ pre{white-space:pre-wrap;word-break:break-word;background:#05070a;border:1px sol
   </div>
   <label>Search path / PID / identity / metric</label>
   <input id="q" value="significance">
+  <label class="small">Requested access level</label>
+  <input id="level" value="0">
+  <button onclick="publicSearch()">Search Public L0</button>
   <button onclick="search()">Search Local</button>
   <button onclick="searchAll()">Search Linked Colonies</button>
   <button onclick="randomRow()">Random Seek</button>
@@ -403,9 +561,19 @@ async function show(url, verb){
     document.getElementById('out').textContent=String(err && err.message || err);
   }
 }
-async function search(){ const q=document.getElementById('q').value; await show('/api/search?q='+encodeURIComponent(q), 'search'); }
-async function searchAll(){ const q=document.getElementById('q').value; await show('/api/search-all?q='+encodeURIComponent(q), 'search-all'); }
-async function randomRow(){ await show('/api/random', 'random'); }
+async function showOpen(url){
+  try {
+    const r = await fetch(url);
+    document.getElementById('out').textContent=await r.text();
+  } catch (err) {
+    document.getElementById('out').textContent=String(err && err.message || err);
+  }
+}
+function requestedLevel(){ return document.getElementById('level').value || '0'; }
+async function publicSearch(){ const q=document.getElementById('q').value; await showOpen('/api/public/search?q='+encodeURIComponent(q)+'&level=0'); }
+async function search(){ const q=document.getElementById('q').value; await show('/api/search?q='+encodeURIComponent(q)+'&level='+encodeURIComponent(requestedLevel()), 'search'); }
+async function searchAll(){ const q=document.getElementById('q').value; await show('/api/search-all?q='+encodeURIComponent(q)+'&level='+encodeURIComponent(requestedLevel()), 'search-all'); }
+async function randomRow(){ await show('/api/random?level='+encodeURIComponent(requestedLevel()), 'random'); }
 loadAuth();
 </script>`;
   res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
@@ -421,36 +589,51 @@ http.createServer(async (req, res) => {
     }
     if (u.pathname === '/') return html(res);
     if (u.pathname === '/api/health') return json(res, publicStatus());
+    if (u.pathname === '/api/public/search') {
+      return json(res, { colony: COLONY, access: { mode: 'public', max_level: LEVEL_PUBLIC }, ...searchLocal(u.query.q, u.query.limit, LEVEL_PUBLIC) });
+    }
     if (u.pathname === '/api/summary') {
-      if (!requireAuth(req, res, 'summary')) return;
+      const auth = requireAuth(req, res, 'summary');
+      if (!auth) return;
       return json(res, readSummary());
     }
     if (u.pathname === '/api/peers') {
-      if (!requireAuth(req, res, 'peers')) return;
+      const auth = requireAuth(req, res, 'peers');
+      if (!auth) return;
       return json(res, { colony: COLONY, peers: PEERS.map(peer => ({ name: peer.name, base: peer.base })) });
     }
     if (u.pathname === '/api/random') {
-      if (!requireAuth(req, res, 'random')) return;
-      const e = index[Math.floor(Math.random() * index.length)];
-      return json(res, { colony: COLONY, index: e, row: seekRow(e) });
+      const auth = requireAuth(req, res, 'random');
+      if (!auth) return;
+      const level = effectiveLevel(auth, u.query.level);
+      if (!level.ok) return accessDenied(res, auth, level);
+      return json(res, { colony: COLONY, access: level, ...randomLocal(level.max_level) });
     }
     if (u.pathname === '/api/seek') {
-      if (!requireAuth(req, res, 'seek')) return;
+      const auth = requireAuth(req, res, 'seek');
+      if (!auth) return;
+      const level = effectiveLevel(auth, u.query.level);
+      if (!level.ok) return accessDenied(res, auth, level);
       const key = String(u.query.pid || u.query.bh || '');
-      const e = index.find(x => x.pid === key || x.bh === key);
-      return json(res, { colony: COLONY, found: Boolean(e), index: e || null, row: e ? seekRow(e) : null });
+      return json(res, { colony: COLONY, access: level, ...seekLocal(key, level.max_level) });
     }
     if (u.pathname === '/api/search') {
-      if (!requireAuth(req, res, 'search')) return;
-      return json(res, { colony: COLONY, ...searchLocal(u.query.q, u.query.limit) });
+      const auth = requireAuth(req, res, 'search');
+      if (!auth) return;
+      const level = effectiveLevel(auth, u.query.level);
+      if (!level.ok) return accessDenied(res, auth, level);
+      return json(res, { colony: COLONY, access: level, ...searchLocal(u.query.q, u.query.limit, level.max_level) });
     }
     if (u.pathname === '/api/search-all') {
-      if (!requireAuth(req, res, 'search-all')) return;
+      const auth = requireAuth(req, res, 'search-all');
+      if (!auth) return;
+      const level = effectiveLevel(auth, u.query.level);
+      if (!level.ok) return accessDenied(res, auth, level);
       const q = String(u.query.q || '').toLowerCase();
       const limit = Math.max(1, Math.min(250, Number(u.query.limit || 50)));
-      const local = { colony: COLONY, ...searchLocal(q, limit) };
-      const peers = await searchPeers(q, limit);
-      return json(res, { q, local, peers });
+      const local = { colony: COLONY, access: level, ...searchLocal(q, limit, level.max_level) };
+      const peers = await searchPeers(q, limit, level.max_level);
+      return json(res, { q, access: level, local, peers });
     }
     res.writeHead(404); res.end('not found');
   } catch (err) {
