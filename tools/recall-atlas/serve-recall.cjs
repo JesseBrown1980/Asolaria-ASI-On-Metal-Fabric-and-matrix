@@ -18,6 +18,7 @@ const KEY_FILE = process.env.ASOLARIA_RECALL_KEY_FILE
 const SHARED_KEY = loadSecret();
 const PEERS = parsePeers(process.env.ASOLARIA_RECALL_PEERS || '');
 const ALLOWED_OWNER_PIDS = parseCsv(process.env.ASOLARIA_RECALL_ALLOWED_OWNER_PIDS || 'OP-JESSE-PID,OP-RAYSSA-PID');
+const MAX_SKEW_S = Math.max(1, Number(process.env.ASOLARIA_RECALL_MAX_SKEW_S || 120));
 
 function parseCsv(raw) {
   return String(raw || '').split(',').map(x => x.trim()).filter(Boolean);
@@ -114,12 +115,21 @@ function isLoopback(remoteAddress) {
     || remoteAddress === '::ffff:127.0.0.1';
 }
 
-function suppliedKey(req) {
-  const direct = req.headers['x-asolaria-recall-key'];
-  if (typeof direct === 'string' && direct.trim()) return direct.trim();
-  const auth = req.headers.authorization || '';
-  const match = /^Bearer\s+(.+)$/i.exec(auth);
-  return match ? match[1].trim() : '';
+function hmacHex(key, ownerPid, host, verb, nonce, tsUnixS) {
+  const ts = Buffer.alloc(8);
+  ts.writeBigUInt64BE(BigInt(tsUnixS));
+  return crypto.createHmac('sha256', Buffer.from(String(key)))
+    .update('LINK|')
+    .update(String(ownerPid))
+    .update('|')
+    .update(String(host))
+    .update('|')
+    .update(String(verb))
+    .update('|')
+    .update(String(nonce))
+    .update('|')
+    .update(ts)
+    .digest('hex');
 }
 
 function safeEqual(a, b) {
@@ -130,20 +140,53 @@ function safeEqual(a, b) {
   return crypto.timingSafeEqual(ab, bb);
 }
 
-function authState(req) {
+function randomNonce() {
+  return crypto.randomBytes(16).toString('hex');
+}
+
+function linkHeaders(verb) {
+  const ts = Math.floor(Date.now() / 1000);
+  const nonce = randomNonce();
+  const hmac = hmacHex(SHARED_KEY, OWNER_PID, COLONY, verb, nonce, ts);
+  return {
+    'x-asolaria-owner-pid': OWNER_PID,
+    'x-asolaria-colony': COLONY,
+    'x-asolaria-verb': verb,
+    'x-asolaria-nonce': nonce,
+    'x-asolaria-ts': String(ts),
+    'x-asolaria-hmac': hmac,
+  };
+}
+
+function authState(req, expectedVerb) {
   const remote = req.socket.remoteAddress || '';
   if (isLoopback(remote)) return { ok: true, mode: 'loopback', remote };
   if (!SHARED_KEY) return { ok: false, mode: 'disabled', remote };
-  if (!safeEqual(suppliedKey(req), SHARED_KEY)) return { ok: false, mode: 'shared-key', remote };
   const owner = String(req.headers['x-asolaria-owner-pid'] || '').trim();
+  const host = String(req.headers['x-asolaria-colony'] || req.headers['x-asolaria-host'] || '').trim();
+  const verb = String(req.headers['x-asolaria-verb'] || '').trim();
+  const nonce = String(req.headers['x-asolaria-nonce'] || '').trim();
+  const tsRaw = String(req.headers['x-asolaria-ts'] || '').trim();
+  const hmac = String(req.headers['x-asolaria-hmac'] || '').trim();
+  if (!owner || !host || !verb || !nonce || !/^\d+$/.test(tsRaw) || !/^[0-9a-f]{64}$/.test(hmac)) {
+    return { ok: false, mode: 'hmac-malformed', remote, owner };
+  }
+  if (verb !== expectedVerb) return { ok: false, mode: 'verb-mismatch', remote, owner, verb, expectedVerb };
+  const ts = Number(tsRaw);
+  const now = Math.floor(Date.now() / 1000);
+  if (!Number.isSafeInteger(ts) || Math.abs(now - ts) > MAX_SKEW_S) {
+    return { ok: false, mode: 'hmac-stale', remote, owner };
+  }
   if (ALLOWED_OWNER_PIDS.length && !ALLOWED_OWNER_PIDS.includes(owner)) {
     return { ok: false, mode: 'owner-pid-denied', remote, owner };
   }
-  return { ok: true, mode: 'shared-key-owner-pid', remote, owner };
+  const expected = hmacHex(SHARED_KEY, owner, host, verb, nonce, ts);
+  if (!safeEqual(hmac, expected)) return { ok: false, mode: 'bad-hmac', remote, owner };
+  return { ok: true, mode: 'hmac-owner-pid', remote, owner, host, verb };
 }
 
-function requireAuth(req, res) {
-  const auth = authState(req);
+function requireAuth(req, res, expectedVerb) {
+  const auth = authState(req, expectedVerb);
   if (auth.ok) return true;
   json(res, {
     ok: false,
@@ -151,12 +194,12 @@ function requireAuth(req, res) {
     colony: COLONY,
     remote: auth.remote,
     auth_mode: auth.mode,
-    hint: 'Send Authorization: Bearer <shared key> or X-Asolaria-Recall-Key. Do not put keys in URLs.',
+    hint: 'Send HMAC headers: X-Asolaria-Owner-PID, X-Asolaria-Colony, X-Asolaria-Verb, X-Asolaria-Nonce, X-Asolaria-TS, X-Asolaria-HMAC. Do not put keys in URLs or on the wire.',
   }, 401);
   return false;
 }
 
-function requestJson(target, key) {
+function requestJson(target, verb) {
   return new Promise((resolve, reject) => {
     const parsed = new URL(target);
     const lib = parsed.protocol === 'https:' ? https : http;
@@ -165,9 +208,7 @@ function requestJson(target, key) {
       timeout: 8000,
       headers: {
         accept: 'application/json',
-        authorization: `Bearer ${key}`,
-        'x-asolaria-owner-pid': OWNER_PID,
-        'x-asolaria-colony': COLONY,
+        ...linkHeaders(verb),
       },
     }, res => {
       let body = '';
@@ -194,7 +235,7 @@ async function searchPeers(q, limit) {
   return Promise.all(PEERS.map(async peer => {
     const endpoint = `${peer.base}/api/search?q=${encodeURIComponent(q)}&limit=${encodeURIComponent(limit)}`;
     try {
-      const result = await requestJson(endpoint, SHARED_KEY);
+      const result = await requestJson(endpoint, 'search');
       return { name: peer.name, base: peer.base, ok: result.status === 200, status: result.status, result: result.body };
     } catch (err) {
       return { name: peer.name, base: peer.base, ok: false, error: err.message };
@@ -215,11 +256,13 @@ function publicStatus() {
     summary,
     auth: {
       loopback_open: true,
-      remote_requires_shared_key: true,
+      remote_requires_hmac_sha256: true,
       remote_requires_owner_pid: Boolean(ALLOWED_OWNER_PIDS.length),
       key_configured: Boolean(SHARED_KEY),
       key_source: SHARED_KEY ? (process.env.ASOLARIA_RECALL_KEY ? 'env' : 'file') : 'missing',
       allowed_owner_pids: ALLOWED_OWNER_PIDS,
+      max_skew_s: MAX_SKEW_S,
+      canonical_message: 'LINK|owner_pid|host|verb|nonce|ts_unix_s_be64',
     },
     peers: PEERS.map(peer => ({ name: peer.name, base: peer.base })),
     corpus: {
@@ -251,6 +294,8 @@ pre{white-space:pre-wrap;word-break:break-word;background:#05070a;border:1px sol
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:14px 0}
 .stat{background:#111820;border:1px solid #263442;border-radius:6px;padding:10px}
 .small{font-size:12px;color:#a8b3bf}
+.auth{border:1px solid #314151;border-radius:6px;padding:10px;margin:12px 0;background:#0e141b}
+.auth input{margin-top:6px}
 </style>
 <header>
   <div><h1>Asolaria Recall + Atlas</h1><div class="small">${COLONY} measured recall surface beside the live atlas server</div></div>
@@ -268,8 +313,18 @@ pre{white-space:pre-wrap;word-break:break-word;background:#05070a;border:1px sol
     <div class="stat"><span class="tag">sig</span><br>${summary.significance_rows || 0}</div>
     <div class="stat"><span class="tag">text</span><br>${summary.text_extracted_rows || 0}</div>
   </div>
-  <p class="small">This page serves local bytes. Remote access requires a shared key. The engine is publishable; the HBP/HBI corpus stays private.</p>
+  <p class="small">This page serves local bytes. Remote access requires HMAC + owner PID. The engine is publishable; the HBP/HBI corpus stays private.</p>
   <p class="small">Acer's 591,286-row table remains an Acer-measured artifact until copied/cross-verified here.</p>
+  <div class="auth">
+    <b>Remote Colony Login</b>
+    <p class="small">For LAN/browser use from another trusted machine. The key signs HMAC locally in this page; it is never sent as a raw key.</p>
+    <input id="owner" placeholder="Owner PID" value="OP-JESSE-PID">
+    <input id="host" placeholder="Calling colony" value="acer">
+    <input id="secret" placeholder="Shared key" type="password">
+    <button onclick="saveAuth()">Save Local Login</button>
+    <button onclick="clearAuth()">Clear</button>
+    <div id="authState" class="small"></div>
+  </div>
   <label>Search path / PID / identity / metric</label>
   <input id="q" value="significance">
   <button onclick="search()">Search Local</button>
@@ -281,10 +336,77 @@ pre{white-space:pre-wrap;word-break:break-word;background:#05070a;border:1px sol
 </section>
 </main>
 <script>
-async function show(url){ const r=await fetch(url); document.getElementById('out').textContent=await r.text(); }
-async function search(){ const q=document.getElementById('q').value; await show('/api/search?q='+encodeURIComponent(q)); }
-async function searchAll(){ const q=document.getElementById('q').value; await show('/api/search-all?q='+encodeURIComponent(q)); }
-async function randomRow(){ await show('/api/random'); }
+const enc = new TextEncoder();
+function isLoopback(){ return ['127.0.0.1','localhost','::1'].includes(location.hostname); }
+function loadAuth(){
+  document.getElementById('owner').value = localStorage.getItem('asolaria.recall.owner') || document.getElementById('owner').value;
+  document.getElementById('host').value = localStorage.getItem('asolaria.recall.host') || document.getElementById('host').value;
+  document.getElementById('secret').value = sessionStorage.getItem('asolaria.recall.key') || '';
+  renderAuthState();
+}
+function saveAuth(){
+  localStorage.setItem('asolaria.recall.owner', document.getElementById('owner').value.trim());
+  localStorage.setItem('asolaria.recall.host', document.getElementById('host').value.trim());
+  sessionStorage.setItem('asolaria.recall.key', document.getElementById('secret').value);
+  renderAuthState();
+}
+function clearAuth(){
+  sessionStorage.removeItem('asolaria.recall.key');
+  document.getElementById('secret').value = '';
+  renderAuthState();
+}
+function renderAuthState(){
+  const has = Boolean(sessionStorage.getItem('asolaria.recall.key') || document.getElementById('secret').value);
+  document.getElementById('authState').textContent = isLoopback()
+    ? 'Loopback UI is open. Remote HMAC login optional for peer calls.'
+    : (has ? 'HMAC login loaded for this tab.' : 'Remote search needs the shared key in this tab.');
+}
+function hex(bytes){ return [...new Uint8Array(bytes)].map(b=>b.toString(16).padStart(2,'0')).join(''); }
+function concat(parts){
+  const len = parts.reduce((n,p)=>n+p.length,0);
+  const out = new Uint8Array(len);
+  let o = 0;
+  for (const p of parts) { out.set(p, o); o += p.length; }
+  return out;
+}
+function u64be(n){
+  const b = new Uint8Array(8);
+  new DataView(b.buffer).setBigUint64(0, BigInt(n), false);
+  return b;
+}
+async function authHeaders(verb){
+  if (isLoopback() && !sessionStorage.getItem('asolaria.recall.key') && !document.getElementById('secret').value) return {};
+  const key = sessionStorage.getItem('asolaria.recall.key') || document.getElementById('secret').value;
+  const owner = document.getElementById('owner').value.trim();
+  const host = document.getElementById('host').value.trim();
+  if (!key || !owner || !host) throw new Error('Remote search needs owner PID, colony, and shared key.');
+  const nonceBytes = crypto.getRandomValues(new Uint8Array(16));
+  const nonce = hex(nonceBytes);
+  const ts = Math.floor(Date.now()/1000);
+  const msg = concat([enc.encode('LINK|'), enc.encode(owner), enc.encode('|'), enc.encode(host), enc.encode('|'), enc.encode(verb), enc.encode('|'), enc.encode(nonce), enc.encode('|'), u64be(ts)]);
+  const k = await crypto.subtle.importKey('raw', enc.encode(key), {name:'HMAC', hash:'SHA-256'}, false, ['sign']);
+  const mac = await crypto.subtle.sign('HMAC', k, msg);
+  return {
+    'X-Asolaria-Owner-PID': owner,
+    'X-Asolaria-Colony': host,
+    'X-Asolaria-Verb': verb,
+    'X-Asolaria-Nonce': nonce,
+    'X-Asolaria-TS': String(ts),
+    'X-Asolaria-HMAC': hex(mac),
+  };
+}
+async function show(url, verb){
+  try {
+    const r = await fetch(url, {headers: await authHeaders(verb)});
+    document.getElementById('out').textContent=await r.text();
+  } catch (err) {
+    document.getElementById('out').textContent=String(err && err.message || err);
+  }
+}
+async function search(){ const q=document.getElementById('q').value; await show('/api/search?q='+encodeURIComponent(q), 'search'); }
+async function searchAll(){ const q=document.getElementById('q').value; await show('/api/search-all?q='+encodeURIComponent(q), 'search-all'); }
+async function randomRow(){ await show('/api/random', 'random'); }
+loadAuth();
 </script>`;
   res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
   res.end(body);
@@ -300,30 +422,30 @@ http.createServer(async (req, res) => {
     if (u.pathname === '/') return html(res);
     if (u.pathname === '/api/health') return json(res, publicStatus());
     if (u.pathname === '/api/summary') {
-      if (!requireAuth(req, res)) return;
+      if (!requireAuth(req, res, 'summary')) return;
       return json(res, readSummary());
     }
     if (u.pathname === '/api/peers') {
-      if (!requireAuth(req, res)) return;
+      if (!requireAuth(req, res, 'peers')) return;
       return json(res, { colony: COLONY, peers: PEERS.map(peer => ({ name: peer.name, base: peer.base })) });
     }
     if (u.pathname === '/api/random') {
-      if (!requireAuth(req, res)) return;
+      if (!requireAuth(req, res, 'random')) return;
       const e = index[Math.floor(Math.random() * index.length)];
       return json(res, { colony: COLONY, index: e, row: seekRow(e) });
     }
     if (u.pathname === '/api/seek') {
-      if (!requireAuth(req, res)) return;
+      if (!requireAuth(req, res, 'seek')) return;
       const key = String(u.query.pid || u.query.bh || '');
       const e = index.find(x => x.pid === key || x.bh === key);
       return json(res, { colony: COLONY, found: Boolean(e), index: e || null, row: e ? seekRow(e) : null });
     }
     if (u.pathname === '/api/search') {
-      if (!requireAuth(req, res)) return;
+      if (!requireAuth(req, res, 'search')) return;
       return json(res, { colony: COLONY, ...searchLocal(u.query.q, u.query.limit) });
     }
     if (u.pathname === '/api/search-all') {
-      if (!requireAuth(req, res)) return;
+      if (!requireAuth(req, res, 'search-all')) return;
       const q = String(u.query.q || '').toLowerCase();
       const limit = Math.max(1, Math.min(250, Number(u.query.limit || 50)));
       const local = { colony: COLONY, ...searchLocal(q, limit) };
