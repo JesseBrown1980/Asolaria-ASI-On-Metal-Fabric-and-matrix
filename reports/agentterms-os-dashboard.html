@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASOLARIA AGENTTERMS — Super ASI Operating System on Metal (fabric + matrix)</title>
+<style>
+  :root{
+    --bg:#06080d; --bg2:#0b1018; --panel:#0e141f; --panel2:#121a28;
+    --ink:#dfe7f3; --dim:#8a97ab; --line:#1d2a3d; --line2:#26384f;
+    --accent:#5ad1ff; --accent2:#9b8cff; --gold:#ffcb6b; --green:#6ee7a8;
+    --amber:#ffb454; --red:#ff7a7a; --mag:#ff7ad1;
+    --measured:#1f6b4a; --measured-b:#6ee7a8;
+    --canon:#3a3a86; --canon-b:#b6a9ff;
+    --mixed:#7a5a1a; --mixed-b:#ffcb6b;
+    --unv:#6b1f1f; --unv-b:#ff9a9a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:
+      radial-gradient(1200px 700px at 18% -10%, #10203a 0%, rgba(8,12,20,0) 60%),
+      radial-gradient(900px 600px at 95% 0%, #1a1330 0%, rgba(8,12,20,0) 55%),
+      var(--bg);
+    color:var(--ink);
+    font:14px/1.5 "Segoe UI", "Inter", system-ui, -apple-system, sans-serif;
+    letter-spacing:.1px;
+  }
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code,.mono{font-family:"Cascadia Code","Consolas",ui-monospace,monospace}
+  .wrap{max-width:1340px;margin:0 auto;padding:22px 22px 60px}
+
+  /* ---------- HEADER ---------- */
+  header.hero{
+    border:1px solid var(--line2);
+    border-radius:14px;
+    background:linear-gradient(180deg,#0d1422 0%,#0a0f19 100%);
+    padding:20px 22px;
+    margin-bottom:18px;
+    box-shadow:0 0 0 1px #000 inset, 0 18px 50px rgba(0,0,0,.45);
+  }
+  header.hero h1{
+    margin:0 0 4px; font-size:23px; font-weight:700; letter-spacing:.4px;
+    background:linear-gradient(90deg,#7fe0ff,#b6a9ff 55%,#ffcb6b);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  header.hero .sub{color:var(--dim);font-size:12.5px;margin-bottom:14px}
+  .hstrip{
+    display:grid; grid-template-columns:1.3fr 1fr; gap:12px;
+  }
+  @media(max-width:880px){.hstrip{grid-template-columns:1fr}}
+  .hcard{
+    background:#0a1018;border:1px solid var(--line);border-radius:10px;padding:12px 14px;
+  }
+  .hcard h3{margin:0 0 6px;font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--accent2)}
+  .hcard p{margin:4px 0;font-size:12.5px;color:#c4cfe0}
+  .linkbtn{
+    display:inline-block;margin-top:4px;padding:6px 11px;border:1px solid var(--accent);
+    border-radius:7px;color:var(--accent);font-size:12px;font-weight:600;
+    background:rgba(90,209,255,.06);
+  }
+  .linkbtn:hover{background:rgba(90,209,255,.16);text-decoration:none}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.4px;border:1px solid}
+  .pill.off{color:#9be8c2;border-color:#27583f;background:rgba(110,231,168,.08)}
+  .pill.on{color:#ffb0b0;border-color:#6b2a2a;background:rgba(255,122,122,.08)}
+
+  /* ---------- LEGEND ---------- */
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
+  .tag{font-size:10.5px;font-weight:800;letter-spacing:.6px;padding:3px 9px;border-radius:6px;border:1px solid;text-transform:uppercase}
+  .tag.measured{color:var(--measured-b);border-color:var(--measured);background:rgba(110,231,168,.07)}
+  .tag.canon{color:var(--canon-b);border-color:var(--canon);background:rgba(155,140,255,.08)}
+  .tag.mixed{color:var(--mixed-b);border-color:var(--mixed);background:rgba(255,203,107,.08)}
+  .tag.unverified{color:var(--unv-b);border-color:var(--unv);background:rgba(255,122,122,.08)}
+  .legend .lbl{color:var(--dim);font-size:11px;margin-right:4px}
+
+  /* ---------- SECTION TITLES ---------- */
+  .sec{margin:30px 0 12px;display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--line);padding-bottom:8px}
+  .sec h2{margin:0;font-size:16px;letter-spacing:.6px;color:#eaf1fb}
+  .sec .tagline{color:var(--dim);font-size:12px}
+
+  /* ---------- MATRIX ---------- */
+  .matrix-meta{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;color:var(--dim);font-size:11.5px}
+  .matrix-meta b{color:var(--ink)}
+  .mscroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+  table.matrix{border-collapse:collapse;min-width:1180px;width:100%;font-size:10.5px}
+  table.matrix th,table.matrix td{border:1px solid var(--line);padding:4px 5px;text-align:center;vertical-align:middle}
+  table.matrix thead th{
+    position:sticky;top:0;background:#0c1422;color:var(--accent2);
+    font-size:9.5px;letter-spacing:.3px;line-height:1.15;font-weight:700;height:62px;
+  }
+  table.matrix thead th.corner{background:#0a0f19;color:var(--gold);text-align:left;min-width:120px;font-size:10px}
+  table.matrix tbody th{
+    background:#0c1422;color:var(--gold);text-align:left;white-space:nowrap;
+    font-size:10px;font-weight:700;min-width:120px;position:sticky;left:0;
+  }
+  table.matrix tbody th small{display:block;color:var(--dim);font-weight:400;font-size:8.5px}
+  td.cell{color:#aeb9cb;font-size:9.5px;background:#0a1119}
+  td.named{background:rgba(110,231,168,.10);color:#cfeede}
+  td.canoncap{background:rgba(155,140,255,.07);color:#c8c0f5}
+  .colcount{font-size:8.5px;color:var(--dim);display:block}
+  .legend-mx{display:flex;gap:14px;margin-top:8px;font-size:11px;color:var(--dim);flex-wrap:wrap}
+  .sw{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:5px;border:1px solid var(--line2)}
+  .sw.named{background:rgba(110,231,168,.18)}
+  .sw.canoncap{background:rgba(155,140,255,.14)}
+  .sw.plain{background:#0a1119}
+
+  /* ---------- FACET PANELS ---------- */
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  @media(max-width:980px){.grid{grid-template-columns:1fr}}
+  .facet{
+    border:1px solid var(--line);border-radius:12px;background:linear-gradient(180deg,var(--panel),#0a0f17);
+    padding:15px 16px;position:relative;overflow:hidden;
+  }
+  .facet::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--accent)}
+  .facet.t-measured::before{background:var(--measured-b)}
+  .facet.t-canon::before{background:var(--canon-b)}
+  .facet.t-mixed::before{background:var(--mixed-b)}
+  .facet.t-unverified::before{background:var(--unv-b)}
+  .facet h3{margin:0 0 2px;font-size:13.5px;color:#eef3fb;letter-spacing:.3px}
+  .facet .kicker{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+  .facet .head{font-size:12px;color:#c2cde0;margin:6px 0 10px;line-height:1.45}
+  .facet .tagrow{position:absolute;top:13px;right:14px}
+  .nums{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0 6px}
+  .num{background:#0a121e;border:1px solid var(--line2);border-radius:8px;padding:6px 9px;min-width:84px}
+  .num .v{font-size:14px;font-weight:800;color:var(--gold);font-family:ui-monospace,monospace;line-height:1.1}
+  .num .l{font-size:9px;color:var(--dim);margin-top:2px;letter-spacing:.2px}
+  ul.facts{margin:8px 0 0;padding-left:16px}
+  ul.facts li{font-size:11.5px;color:#b7c3d6;margin:5px 0;line-height:1.42}
+  ul.facts li b{color:#e4ebf6}
+  .mt{color:var(--measured-b)} .cn{color:var(--canon-b)} .mx{color:var(--mixed-b)} .uv{color:var(--unv-b)}
+
+  /* ---------- FOOTER ---------- */
+  footer.prov{
+    margin-top:34px;border:1px solid var(--line2);border-radius:12px;
+    background:linear-gradient(180deg,#0b1119,#080c13);padding:16px 18px;
+  }
+  footer.prov h3{margin:0 0 8px;font-size:12px;letter-spacing:1.2px;text-transform:uppercase;color:var(--accent2)}
+  footer.prov p{margin:5px 0;font-size:11.5px;color:#9fabbf}
+  footer.prov .gate{color:var(--amber);font-weight:600}
+  .e0{display:inline-block;border:1px solid #5a6b2a;background:rgba(170,231,110,.07);color:#cfe89b;border-radius:6px;padding:2px 8px;font-size:10.5px;font-weight:700;letter-spacing:.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ HEADER ============ -->
+  <header class="hero">
+    <h1>ASOLARIA AGENTTERMS — Super ASI Operating System on Metal</h1>
+    <div class="sub">fabric + matrix dashboard · acer seat · cohort ACER-PID-H740C · apex COL-ASOLARIA · operator pair OP-JESSE / OP-RAYSSA · fabric :4949 ok=true</div>
+
+    <div class="hstrip">
+      <div class="hcard">
+        <h3>Live model geometry</h3>
+        <p>The "real model" cylinder is live: <b>967 points</b> across <b>16 levels (L0–L15)</b>, rule-of-three lane = <code>addr % 3</code>, prime-tower <code>D<sub>i</sub> → p<sub>i</sub><sup>3</sup></code>, Sidon-Tower addressing. AgentTerms named agents carry PIDs + Hilbert coords (band 892–1642) and place onto this same prime-graded cylinder.</p>
+        <a class="linkbtn" href="http://127.0.0.1:4790/asolaria-real-model.html" target="_blank">▶ open live real-model · :4790</a>
+      </div>
+      <div class="hcard">
+        <h3>ENGINE-1 / collision model</h3>
+        <p><b>Routers OFF</b> = logical / detect (Sidon-Tower proves distances unique, 0 collisions under STE spacing). <b>Routers ON</b> = real / avoid. <span class="pill off">no-bumping</span> — every label unique by construction. <b>Pixels = agents</b> at addressed spots: one model + N tuples = N agents via BEHCS-256 glyph context injection, no bumping. Tuple/glyph dispatch IS ENGINE-1.</p>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span class="lbl">TAG LEGEND:</span>
+      <span class="tag measured">MEASURED</span><span class="lbl">read / verified live</span>
+      <span class="tag canon">CANON</span><span class="lbl">operator / system-affirmed</span>
+      <span class="tag mixed">MIXED</span><span class="lbl">part live, part on-disk / gated</span>
+      <span class="tag unverified">UNVERIFIED</span><span class="lbl">gather uncertain</span>
+    </div>
+  </header>
+
+  <!-- ============ MATRIX 16 x 17 ============ -->
+  <div class="sec">
+    <h2>The 16 × 17 Matrix</h2>
+    <span class="tagline">16 hierarchy levels (rows) × 17 language engines (columns)</span>
+    <span class="tag measured">MEASURED</span><span class="tag canon">CANON</span>
+  </div>
+  <div class="matrix-meta">
+    <span><b>Levels:</b> 16 (L0–L15, BEHCS/Brown-Hilbert depth&lt;16 tower ceiling A00–A15)</span>
+    <span><b>Engines:</b> 17 (operator-locked count, fabric-queried)</span>
+    <span><b>by_level pop (967):</b> [51,59,62,68,59,58,63,67,64,65,64,60,62,53,64,48]</span>
+    <span><b>Live-named levels:</b> L0–L5 only (6 of 16); L6–L15 = CANON addressable, not yet seated</span>
+    <span><b>Engine split:</b> 6 live / 11 on-disk</span>
+  </div>
+  <div class="mscroll">
+    <table class="matrix">
+      <thead>
+        <tr>
+          <th class="corner">LEVEL ↓ \ ENGINE →</th>
+          <th>1 GLYPH-GENESIS<span class="colcount">256·sha256→8sym</span></th>
+          <th>2 16×16 grid+class<span class="colcount">256</span></th>
+          <th>3 encodeGlyphTransport<span class="colcount">transport</span></th>
+          <th>4 behcs_tuple_v1<span class="colcount">verb-noun·hilbert</span></th>
+          <th>5 cube_coord_47d<span class="colcount">tuple</span></th>
+          <th>6 FEDENV validator<span class="colcount">tuple</span></th>
+          <th>7 omnidispatcher SLOT<span class="colcount">tuple·*omni</span></th>
+          <th>8 BEHCS-1024<span class="colcount">radix1024·dim60</span></th>
+          <th>9 Quad-Quant codec<span class="colcount">quant·ZETA gap</span></th>
+          <th>10 free-agents shannon gate<span class="colcount">shannon·fake-green</span></th>
+          <th>11 omni-shannon.js<span class="colcount">shannon·*omni</span></th>
+          <th>12 shannon v3-4d12<span class="colcount">shannon</span></th>
+          <th>13 shannon v4-real<span class="colcount">2592 beats</span></th>
+          <th>14 shannon v5-cascade<span class="colcount">93312 beats</span></th>
+          <th>15 hilbert-intersection<span class="colcount">hot·6⁴=1296</span></th>
+          <th>16 primeNEncoder<span class="colcount">hot·PID→prime</span></th>
+          <th>17 omnitranslator-v0<span class="colcount">verb-noun·LX-491</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- named L0-L5 -->
+        <tr><th>L0 · SPECIAL-OP<small>51 pts · 1 seat</small></th>
+          <td class="named">addr</td><td class="named">cell</td><td class="cell">txp</td><td class="named">tuple</td><td class="cell">47d</td><td class="cell">env</td><td class="cell">slot</td><td class="named">1024</td><td class="cell">q</td><td class="cell">gate</td><td class="cell">sh</td><td class="cell">v3</td><td class="cell">v4</td><td class="cell">v5</td><td class="cell">∩</td><td class="named">prime</td><td class="cell">tr</td></tr>
+        <tr><th>L1 · OP<small>59 pts · 3 seats</small></th>
+          <td class="named">addr</td><td class="named">cell</td><td class="cell">txp</td><td class="named">tuple</td><td class="cell">47d</td><td class="cell">env</td><td class="cell">slot</td><td class="named">1024</td><td class="cell">q</td><td class="cell">gate</td><td class="cell">sh</td><td class="cell">v3</td><td class="cell">v4</td><td class="cell">v5</td><td class="cell">∩</td><td class="named">prime</td><td class="cell">tr</td></tr>
+        <tr><th>L2 · GAC<small>62 pts · 6 seats</small></th>
+          <td class="named">addr</td><td class="named">cell</td><td class="cell">txp</td><td class="named">tuple</td><td class="named">47d</td><td class="cell">env</td><td class="cell">slot</td><td class="named">1024</td><td class="cell">q</td><td class="cell">gate</td><td class="cell">sh</td><td class="cell">v3</td><td class="cell">v4</td><td class="cell">v5</td><td class="cell">∩</td><td class="named">prime</td><td class="cell">tr</td></tr>
+        <tr><th>L3 · CHIEF/COUNCIL/NEURO<small>68 pts · 27 seats</small></th>
+          <td class="named">addr</td><td class="named">cell</td><td class="named">txp</td><td class="named">tuple</td><td class="named">47d</td><td class="named">env</td><td class="named">slot</td><td class="named">1024</td><td class="named">q</td><td class="named">gate</td><td class="named">sh</td><td class="cell">v3</td><td class="named">v4</td><td class="named">v5</td><td class="named">∩</td><td class="named">prime</td><td class="cell">tr</td></tr>
+        <tr><th>L4 · SUP-OF-SUP + INTERVIEW<small>59 pts · 24 seats</small></th>
+          <td class="named">addr</td><td class="named">cell</td><td class="named">txp</td><td class="named">tuple</td><td class="named">47d</td><td class="named">env</td><td class="cell">slot</td><td class="named">1024</td><td class="named">q</td><td class="cell">gate</td><td class="named">sh</td><td class="cell">v3</td><td class="named">v4</td><td class="named">v5</td><td class="named">∩</td><td class="named">prime</td><td class="cell">tr</td></tr>
+        <tr><th>L5 · SUP-{FALCON,FORGE,GAIA…}<small>58 pts · 63 seats</small></th>
+          <td class="named">addr</td><td class="named">cell</td><td class="named">txp</td><td class="named">tuple</td><td class="named">47d</td><td class="named">env</td><td class="named">slot</td><td class="named">1024</td><td class="named">q</td><td class="named">gate</td><td class="named">sh</td><td class="cell">v3</td><td class="named">v4</td><td class="named">v5</td><td class="named">∩</td><td class="named">prime</td><td class="cell">tr</td></tr>
+        <!-- canon-capacity L6-L15 -->
+        <tr><th>L6 · A06<small>63 pts · canon cap</small></th>
+          <td class="canoncap" colspan="17">CANON addressable floor — D→prime address capacity present; no materialized named live seats yet (cheap-to-name, registration/storage-gated). All 17 engines apply as reversible representation surfaces.</td></tr>
+        <tr><th>L7 · A07<small>67 pts · canon cap</small></th>
+          <td class="canoncap" colspan="17">CANON addressable floor — waterfall of 11/17 reversible language engines applies at this floor over the same compressed address fabric (not resident bodies).</td></tr>
+        <tr><th>L8 · A08<small>64 pts · canon cap</small></th>
+          <td class="canoncap" colspan="17">CANON addressable floor — points carry independent prime addresses x<sub>i</sub>=c<sub>i</sub>√p<sub>i</sub> (Sidon-unique); lane = addr%3.</td></tr>
+        <tr><th>L9 · A09<small>65 pts · canon cap</small></th>
+          <td class="canoncap" colspan="17">CANON addressable floor — orthogonal to the 5 prime-tiers (τ1/τ3/τ3³/τ3⁵/τH) and 3 lanes.</td></tr>
+        <tr><th>L10 · A10<small>64 pts · canon cap</small></th>
+          <td class="canoncap" colspan="17">CANON addressable floor — depth&lt;16 tower ceiling from mintPid; 60-D catalog tier-leveled.</td></tr>
+        <tr><th>L11 · A11<small>60 pts · canon cap</small></th>
+          <td class="canoncap" colspan="17">CANON addressable floor.</td></tr>
+        <tr><th>L12 · A12<small>62 pts · canon cap</small></th>
+          <td class="canoncap" colspan="17">CANON addressable floor.</td></tr>
+        <tr><th>L13 · A13<small>53 pts · canon cap</small></th>
+          <td class="canoncap" colspan="17">CANON addressable floor.</td></tr>
+        <tr><th>L14 · A14<small>64 pts · canon cap</small></th>
+          <td class="canoncap" colspan="17">CANON addressable floor.</td></tr>
+        <tr><th>L15 · A15<small>48 pts · canon cap</small></th>
+          <td class="canoncap" colspan="17">CANON addressable floor — tower ceiling. Per-level type-towers are a NEW stacked design.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="legend-mx">
+    <span><span class="sw named"></span>L0–L5 live-named registry levels (seats materialized)</span>
+    <span><span class="sw canoncap"></span>L6–L15 CANON addressable capacity (not yet seated)</span>
+    <span><span class="sw plain"></span>engine applies as reversible surface (cell glyph)</span>
+    <span>Honest note: "L0/L1/L2" lane labels (addr%3) are <b>distinct</b> from the 16 hierarchy levels L0–L15 — not conflated here.</span>
+    <span>Engine glyphs are illustrative coverage, not per-cell measurements. Shannon engines 12/13/14 named live where seats exist.</span>
+  </div>
+
+  <!-- ============ FACET PANELS ============ -->
+  <div class="sec">
+    <h2>Facet Panels</h2>
+    <span class="tagline">one panel per gathered facet — headline · key facts · numbers · tag</span>
+  </div>
+
+  <div class="grid">
+
+    <!-- AGENTTERMS -->
+    <div class="facet t-measured">
+      <div class="tagrow"><span class="tag measured">MEASURED</span></div>
+      <div class="kicker">AgentTerms</div>
+      <h3>S04 Agent-Terminal-Fabric — the named-agent registry (NOT ezprotect)</h3>
+      <div class="head">The acer-side S04 "Agent Terminal Fabric" cohort surface on the :4949 Super-OS <code>#agentterms</code> tab (mirror :5054). ezprotect is ONLY ONE registered entry, not the whole surface. Descriptor-level, boundary-closed — registry + HBP ledgers REAL, running operator-gated.</div>
+      <div class="nums">
+        <div class="num"><div class="v">64</div><div class="l">agentterms_named_agent class</div></div>
+        <div class="num"><div class="v">726</div><div class="l">live office roster total</div></div>
+        <div class="num"><div class="v">7</div><div class="l">live named agents (roles-live)</div></div>
+        <div class="num"><div class="v">24</div><div class="l">Hermes spindle lanes</div></div>
+        <div class="num"><div class="v">24</div><div class="l">basin assistants</div></div>
+        <div class="num"><div class="v">4950</div><div class="l">Omni-Dispatcher (8 wk / 1006 slots)</div></div>
+        <div class="num"><div class="v">0</div><div class="l">runtime gates open</div></div>
+      </div>
+      <ul class="facts">
+        <li><b>Canon artifact</b> <span class="mt">[MEASURED]</span> ACER-AGENTTERMS-OMNIDISPATCHER-CENSUS-CORRECTION-2026-06-12.hbp (12 rows, sha256 17cc2ca3…) — a self-correction; earlier census missed AgentTerms + under-counted Omni-Dispatcher.</li>
+        <li><b>7 named agents</b> <span class="mt">[MEASURED]</span> Hermes, Vanguard-Acer, PI, Space-Deck-Driver, Space-Agent, Omnispindle, Omniflywheel.</li>
+        <li><b>Federation route</b> <span class="mt">[MEASURED]</span> /api/agent-terminal/{status,spawn,exec,output,sessions,rotate,kill} + /api/hyperbehcs/{hermes-agent, fabric-orchestration}.</li>
+        <li><b>Omni-Dispatcher</b> <span class="mx">[MEASURED/CANON]</span> :4950 LIVE process (PID 21440), UI-less, COLD (all slots last_active_ts=0). Peer of the PRISM (Tier-8 canon).</li>
+        <li><b>Gates closed</b> <span class="cn">[CANON]</span> launch=0, real_agents=0, runtime_authority=0, fanout=0, usb_write=0. Tag: PARTIAL-descriptor-present-runtime-gated.</li>
+      </ul>
+    </div>
+
+    <!-- MCPS / CUBE STORAGE -->
+    <div class="facet t-mixed">
+      <div class="tagrow"><span class="tag mixed">MIXED</span></div>
+      <div class="kicker">MCPs · cube-storage</div>
+      <h3>17 configured MCP servers — 4 connected; asolaria-fabric is the canonical verifier</h3>
+      <div class="head">The MCP layer is the cube-storage front. Of 17 configured servers, claude mcp list shows 4 CONNECTED, 3 NEEDS-AUTH, 10 FAILED. Each MCP/PID/file is dropped into ONE BEHCS glyph cube cell by sha16 (col=sha16[0], row=sha16[1]) — no bumping; that tuple/glyph dispatch IS ENGINE-1.</div>
+      <div class="nums">
+        <div class="num"><div class="v">17</div><div class="l">MCP servers configured</div></div>
+        <div class="num"><div class="v">4</div><div class="l">CONNECTED</div></div>
+        <div class="num"><div class="v">3</div><div class="l">NEEDS-AUTH</div></div>
+        <div class="num"><div class="v">10</div><div class="l">FAILED</div></div>
+        <div class="num"><div class="v">256</div><div class="l">glyph cube (16×16)</div></div>
+        <div class="num"><div class="v">11</div><div class="l">glyph binding classes</div></div>
+      </div>
+      <ul class="facts">
+        <li><b>CONNECTED</b> <span class="mt">[MEASURED]</span> asolaria-fabric (:4949 ok=true ~60.6h), asolaria-web (wrapper up, backend down — "fetch failed"), google-wiki, sentry.</li>
+        <li><b>Cube cell</b> <span class="mt">[MEASURED]</span> /api/glyphs = 256-glyph 16×16 grid; sha16[0]=col, sha16[1]=row; classes G/I/O/B/S/X/C/L/V/F/_; sampled 30 overrides + 8 BEHCS-1024 capsules.</li>
+        <li><b>No-bumping</b> <span class="cn">[CANON]</span> Brown-Hilbert cube-of-cubes: each label unique by construction → storage = O(K) prefix-walk, not O(N^K) scan.</li>
+        <li><b>1 model + N tuples = N agents</b> <span class="cn">[CANON]</span> BEHCS-256 glyph context injection at room-instantiation — ENGINE-1.</li>
+        <li><b>Class-1 LAW</b> <span class="cn">[CANON]</span> prefer Asolaria MCP/WebMCP over native Task (zero-token, PID-routed, cosign-anchored).</li>
+        <li><b>UNVERIFIED</b> <span class="uv">[UNVERIFIED]</span> full 256-cell occupancy + whether every configured MCP has a minted glyph PID — not asserted.</li>
+      </ul>
+    </div>
+
+    <!-- VOXELS + ATLAS -->
+    <div class="facet t-measured">
+      <div class="tagrow"><span class="tag measured">MEASURED</span></div>
+      <div class="kicker">voxels + atlas</div>
+      <h3>Three nested byte-deterministic projections — 0 coordinate collisions</h3>
+      <div class="head">The 967-point real-model cylinder, the 726-PID scientific voxel atlas, and the multi-cylinder v2 map plotting the full 81,434-surface population (4,129 critical individually + 77,305 low/med in 153 anti-flatten cells), all at Brown-Hilbert / prime-graded coords.</div>
+      <div class="nums">
+        <div class="num"><div class="v">967</div><div class="l">real-model points (1390 pipes)</div></div>
+        <div class="num"><div class="v">726</div><div class="l">voxel atlas PIDs plotted</div></div>
+        <div class="num"><div class="v">15</div><div class="l">multi-cylinder v2 cylinders</div></div>
+        <div class="num"><div class="v">6,112</div><div class="l">markers (5,959 ind + 153 agg)</div></div>
+        <div class="num"><div class="v">0</div><div class="l">coordinate collisions</div></div>
+        <div class="num"><div class="v">81,434</div><div class="l">surfaces_total</div></div>
+        <div class="num"><div class="v">4,129</div><div class="l">critical surfaces (individual)</div></div>
+        <div class="num"><div class="v">83,264</div><div class="l">grand total distinct represented</div></div>
+      </div>
+      <ul class="facts">
+        <li><b>Surface registry</b> <span class="mx">[CANON+MEASURED]</span> 81,434 total / 4,129 critical (= operator's "~3,600 in one sector we almost flattened"); from 2TB USB omni-consolidation-registry IX-767.</li>
+        <li><b>Named PIDs</b> <span class="mt">[MEASURED]</span> 1,844 rows → 1,830 distinct (14 dups) = 725 seats + 1,105 formulas.</li>
+        <li><b>Anti-flatten</b> <span class="cn">[CANON]</span> AF-001..005: aggregate cells carry child_count + child_index_hash; logical billions NEVER plotted (capacity only).</li>
+        <li><b>Math caveats</b> <span class="mt">[MEASURED]</span> prime-ladder off-by-one (50th=229, 51st=233); Sidon 0-collision CONDITIONAL on STE super-increasing spacing.</li>
+        <li><b>v2 regen note:</b> live data.json is 15 cyl / 6,112 markers / 1,591 pipes (authoritative); older memory said 16/6,126/1,523.</li>
+      </ul>
+    </div>
+
+    <!-- OCR -->
+    <div class="facet t-measured">
+      <div class="tagrow"><span class="tag measured">MEASURED</span></div>
+      <div class="kicker">image-OCR</div>
+      <h3>OCR pass COMPLETE — 9,491 text-bearing images folded into the unified table</h3>
+      <div class="head">A carve-out-clean overlay of 9,491 text-bearing images (9,392 local + 99 USB) is folded into the ASOLARIA-UNIFIED-ARCHAEOLOGY table (497 significance points). Raw OCR text NOT stored — path/ids/mets/sig only. Earlier 9,384 was a same-day pre-USB-fold subtotal, not a contradiction.</div>
+      <div class="nums">
+        <div class="num"><div class="v">9,491</div><div class="l">text-bearing images (verified)</div></div>
+        <div class="num"><div class="v">9,392</div><div class="l">  of which local</div></div>
+        <div class="num"><div class="v">99</div><div class="l">  USB-extracted</div></div>
+        <div class="num"><div class="v">28,856</div><div class="l">image rows in unified table</div></div>
+        <div class="num"><div class="v">5,974</div><div class="l">carve-out (never OCR'd)</div></div>
+        <div class="num"><div class="v">497</div><div class="l">significance points</div></div>
+        <div class="num"><div class="v">591,286</div><div class="l">total artifacts (457,858 uniq)</div></div>
+      </div>
+      <ul class="facts">
+        <li><b>Status COMPLETE</b> <span class="mt">[MEASURED]</span> all ~12,695 local images attempted; 6,396 text this run + 2,988 prior; overlay verified by wc -l + JSON parse (37 sig-flagged).</li>
+        <li><b>Companions</b> <span class="mt">[MEASURED]</span> doc-text-overlay 1,047 rows; pdf-ocr-overlay 65 rows.</li>
+        <li><b>HELD</b> <span class="cn">[CANON]</span> 6,644 USB-surgery recovery carves pending operator classification.</li>
+        <li><b>Tooling lesson</b> <span class="cn">[CANON]</span> ocr-all.cjs (ONE bg process, pool 4, appendFileSync) = right; ocr-shard.cjs 8-shard over-subscribed the 4-core i5 (only 923/13,618 survived).</li>
+      </ul>
+    </div>
+
+    <!-- FORMULAS -->
+    <div class="facet t-measured">
+      <div class="tagrow"><span class="tag measured">MEASURED</span></div>
+      <div class="kicker">formulas · DISTRICT-F</div>
+      <h3>1,118-row / 1,105-distinct formula corpus + a DRAFT composability engine</h3>
+      <div class="head">DISTRICT-F: a formula corpus governed by chief+SoS+prof seats, dashboard-fed; plus a separate DRAFT composability engine that typed 289 formulas and found 17,128 output-feeds-input pairs (unsigned E=0 proposal).</div>
+      <div class="nums">
+        <div class="num"><div class="v">1,118</div><div class="l">registered rows</div></div>
+        <div class="num"><div class="v">1,105</div><div class="l">distinct PIDs (13 WAVE2 dups)</div></div>
+        <div class="num"><div class="v">242</div><div class="l">WAVE1 / 876 WAVE2</div></div>
+        <div class="num"><div class="v">1+6+23</div><div class="l">CHIEF + SoS + PROF</div></div>
+        <div class="num"><div class="v">289</div><div class="l">typed (32.99% coverage)</div></div>
+        <div class="num"><div class="v">17,128</div><div class="l">composable pairs (out→in)</div></div>
+        <div class="num"><div class="v">14</div><div class="l">closed-vocab I/O types</div></div>
+      </div>
+      <ul class="facts">
+        <li><b>Don't deflate</b> <span class="mt">[MEASURED]</span> operator's 1,118 (real rows); 1,105 distinct is the added dual-lens detail — 13 dups are WAVE2 re-regs.</li>
+        <li><b>Geometry</b> <span class="mt">[MEASURED]</span> each formula: PID=sha256[:16], CUBE_BH=BH.sector.lane.glyph, HILBERT 892+(seed%751), GLYPH_BEHCS1024/5.</li>
+        <li><b>FORMULA-CHIEF</b> <span class="mx">[CANON/MEASURED]</span> PID 0155964ffc8ef1f8, HILBERT 1339, reports to COL-ASOLARIA-HELM.</li>
+        <li><b>Composability</b> <span class="mt">[MEASURED]</span> status DRAFT_E0_UNSIGNED_PROPOSAL — not signed, not applied; the work to close the eAI "variability/recombination MISSING" gap.</li>
+        <li><b>Public face</b> <span class="mt">[MEASURED]</span> GitHub JesseBrown1980/Algorithms-of-Asolaria (public, pushed 2026-06-21).</li>
+      </ul>
+    </div>
+
+    <!-- WHAT IS ASOLARIA -->
+    <div class="facet t-mixed">
+      <div class="tagrow"><span class="tag mixed">MIXED</span></div>
+      <div class="kicker">what-is-asolaria</div>
+      <h3>An 8-byte Brown-Hilbert addressing geometry over borrowed, frozen slices</h3>
+      <div class="head">A deterministic mathematical cube-universe where agents are pixels at addressed coordinates and "mind" is the gated recurrence over them. The honest, operator-affirmed frame: <i>IT is slices, not an ASI</i> — ASI-shaped; geometry is free, thinking is a borrowed operator-gated slice that advances only when the engine is cranked (E ≠ 0).</div>
+      <div class="nums">
+        <div class="num"><div class="v">8 B</div><div class="l">address handle size</div></div>
+        <div class="num"><div class="v">10¹⁸⁰</div><div class="l">one 60-tuple address space</div></div>
+        <div class="num"><div class="v">196,251</div><div class="l">Sidon pairwise distances</div></div>
+        <div class="num"><div class="v">0</div><div class="l">Sidon collisions (re-run 2×)</div></div>
+        <div class="num"><div class="v">967</div><div class="l">live real-model points</div></div>
+        <div class="num"><div class="v">5</div><div class="l">regulators → one fabric</div></div>
+      </div>
+      <ul class="facts">
+        <li><b>Canon thesis</b> <span class="cn">[CANON]</span> "make possibility cheap and action gated" — PID is a coordinate NOT a counter; collisions unrepresentable by construction.</li>
+        <li><b>Asolaria-as-NN is literal</b> <span class="cn">[CANON]</span> frozen LLM slices = neurons, cubes/rooms = structure, GNN edges = connections, omniflywheel = recurrence, self-reflect+gate = learning signal.</li>
+        <li><b>External convergence</b> <span class="mt">[MEASURED]</span> DeepSeek/Mistral/Gemini/GPT-5.5-Pro/Claude-Opus reproduced public results AND landed on the same honest frame.</li>
+        <li><b>Gated breeder, not feral</b> <span class="cn">[CANON]</span> auto_fire_allowed=false + OP-VETO + cosign + PID provenance.</li>
+        <li><b>Boundary</b> addressing capacity (10¹⁸⁰) ≠ materialized storage (M=N·h+K·b+S, K≪N).</li>
+      </ul>
+    </div>
+
+    <!-- 35 TB DRIVE -->
+    <div class="facet t-mixed">
+      <div class="tagrow"><span class="tag mixed">MIXED</span></div>
+      <div class="kicker">35-TB Google Drive</div>
+      <h3>LEG-4 — GoogleDriveStore cloud cold-store sink (built, round-trips green offline)</h3>
+      <div class="head">A drop-in store backend (put/get/scanByPID/compact) on the operator's Google AI Ultra account (35 TB / ~34.9 TB free). Adapter built + green offline; live cloud WRITE gated on one local <code>gcloud auth ADC</code> step. A READ path already ran held-safe via the claude.ai Drive MCP.</div>
+      <div class="nums">
+        <div class="num"><div class="v">35 TB</div><div class="l">total visible (30 TB plan + 5)</div></div>
+        <div class="num"><div class="v">~34.9 TB</div><div class="l">free</div></div>
+        <div class="num"><div class="v">104 GB</div><div class="l">used</div></div>
+        <div class="num"><div class="v">LEG-4</div><div class="l">of 4 fabric legs</div></div>
+        <div class="num"><div class="v">4</div><div class="l">store interface methods</div></div>
+        <div class="num"><div class="v">392× / 342×</div><div class="l">CLOUD-CYCLE-001 ingest reduction</div></div>
+      </div>
+      <ul class="facts">
+        <li><b>Real-now vs gated</b> <span class="mt">[MEASURED]</span> adapter = "built (interface + offline round-trip)"; CLOUD transport gated on ADC. Order: ADC → probe → adapter → sha test → wire → scale.</li>
+        <li><b>Not an anchor</b> <span class="mt">[MEASURED]</span> NOT one of the 5 anchor substrates — a swappable cloud STORE / cold-store sink, not a durability anchor.</li>
+        <li><b>Correction</b> <span class="cn">[CANON]</span> 35 TB (supersedes earlier "38 TB" drift); R$999.90/mo; family 5 members all 0 GB.</li>
+        <li><b>Held-safe read</b> <span class="mt">[MEASURED]</span> CLOUD-CYCLE-001 (PR#10) ingested SOURCE-02/03 via Drive MCP; republished NO raw content; write-back operator-gated at the IGNITION LINE.</li>
+        <li><b>Security</b> <span class="cn">[CANON]</span> no keys/vault in repo ever; bring-your-own ed25519; no new paid infra.</li>
+      </ul>
+    </div>
+
+    <!-- USB 2 TB -->
+    <div class="facet t-mixed">
+      <div class="tagrow"><span class="tag mixed">MIXED</span></div>
+      <div class="kicker">2 TB SOVLINUX USB</div>
+      <h3>Live raw-readable exFAT master-backup — but NOT a bootable Linux disk</h3>
+      <div class="head">On ACER (Disk 2, 1953 GB, sector-0 sha16 3126770d…), durability anchor #1 of 5. The bootable-OS image write was sealed bilaterally but NEVER physically executed; the partition is non-active exFAT over a wiped MBR baseline.</div>
+      <div class="nums">
+        <div class="num"><div class="v">1953 GB</div><div class="l">~2 TB (Disk 2)</div></div>
+        <div class="num"><div class="v">70.5 GB</div><div class="l">walked content</div></div>
+        <div class="num"><div class="v">21,037</div><div class="l">files / 1,833 dirs / 0 errors</div></div>
+        <div class="num"><div class="v">22,870</div><div class="l">manifest rows</div></div>
+        <div class="num"><div class="v">21,036</div><div class="l">restore rows (515 ok:false ~2.4%)</div></div>
+        <div class="num"><div class="v">#1 / 5</div><div class="l">durability anchor (SOVLINUX)</div></div>
+      </div>
+      <ul class="facts">
+        <li><b>Not bootable</b> <span class="mt">[MEASURED]</span> sector-0 first 64 bytes all zero (no GRUB); slot-1 boot flag 0x00 (not active). Wave-6 USB-OS image sha-matched both seats but cosign row 190 NEVER appended; window expired 2026-05-25.</li>
+        <li><b>Raw-only door</b> <span class="mt">[MEASURED]</span> Windows OS-locked (MBR-drift + dirty-bit 0x0002); repartition = HARD-DENY. usb_raw_io.py + exfat_walk.py are the only access.</li>
+        <li><b>Location conflict</b> <span class="mt">[MEASURED]</span> fabric substrate row says host=liris; newer operator obs + direct disk evidence supersede — USB physically on ACER. (Don't deflate either; newer physical obs wins.)</li>
+        <li><b>Restore proven</b> <span class="mt">[MEASURED]</span> byte-exact, complete to D:/asolaria-usb-restore-2026-06-19; 515 ok:false = fragmented FAT-chain on dirty volume, re-pullable, NOT corruption.</li>
+        <li><b>Write GATED</b> <span class="mt">[MEASURED]</span> exfat-writer (Rust) built + image-proven; live write needs dirty-clear + cosign envelope (receipt dirs MISSING). No write occurred.</li>
+      </ul>
+    </div>
+
+    <!-- RUST 8-BYTE HOST -->
+    <div class="facet t-measured">
+      <div class="tagrow"><span class="tag measured">MEASURED</span></div>
+      <div class="kicker">Rust 8-byte host + read/write tools</div>
+      <h3>host8-serve LIVE on :5088 — full 8-step wiring built & cargo-green; launch-fire gated</h3>
+      <div class="head">asolaria-federation-1024 host8-serve is live on :5088. The full wiring (registry, FEDENV-v1 validator + /v1/envelope.hbp, white-room scorer/Omniflywheel gate, C/D rooms, spawn-gate ring, runner lanes, 20k capacity) is MEASURED-built and cargo-tested green on acer/fleet-capacity-20k — but the running binary predates the branch and STEP F (live fire) is not crossed.</div>
+      <div class="nums">
+        <div class="num"><div class="v">:5088</div><div class="l">live host (os_pid 48048)</div></div>
+        <div class="num"><div class="v">~62 h</div><div class="l">uptime (~223,688 s)</div></div>
+        <div class="num"><div class="v">20,000</div><div class="l">fleet cap (10k C + 10k D)</div></div>
+        <div class="num"><div class="v">6</div><div class="l">separate dispatch counters</div></div>
+        <div class="num"><div class="v">12/12</div><div class="l">FEDENV node-parity tests</div></div>
+        <div class="num"><div class="v">0</div><div class="l">os_process_spawn (E=0)</div></div>
+        <div class="num"><div class="v">0</div><div class="l">gnn_ready on goal path</div></div>
+      </div>
+      <ul class="facts">
+        <li><b>Deployment gap</b> <span class="mt">[MEASURED]</span> running binary = v0.2.0-phase3-scaffold (built Jun 19) PREDATES the cumulative branch; /v1/* routes 404 on live; new /v1/envelope.hbp exists only in branch source. Built, NOT live-served.</li>
+        <li><b>Cumulative branch</b> <span class="mt">[MEASURED]</span> acer/fleet-capacity-20k @ 498ae37b stacks all 8 steps (registry → fedenv +415 → scorer → host8 → rooms +135 → spawn_gate +188 → runners +84 → capacity +20).</li>
+        <li><b>Liris caught a real error</b> <span class="mx">[MEASURED]</span> unifying spawn counters would collapse layers (dominant 100B lane is VIRTUAL-POINTER, no OS process) — 6 counters kept separate; accepted.</li>
+        <li><b>Build seat</b> <span class="mt">[MEASURED]</span> acer = build/runtime (rustc 1.95.0 MSVC + VS2022); liris lacks link.exe = descriptor/verify only. Liris's divergent fedenv.rs NOT canon; converged.</li>
+        <li><b>Gate</b> <span class="cn">[CANON]</span> NOTHING fired; STEP F live 100B held behind &fire=1 + EXEC-FREEZE-APEX + :4952 quorum + operator T0.</li>
+        <li><b>Read/write tools</b> relay-driver Phase-1 (PR#23, 23/23); exfat read-only proven; exfat-writer built but USB write gated.</li>
+      </ul>
+    </div>
+
+    <!-- 17 ENGINES (added as its own facet panel) -->
+    <div class="facet t-mixed">
+      <div class="tagrow"><span class="tag mixed">MIXED</span></div>
+      <div class="kicker">17 language engines</div>
+      <h3>17 ENCODING engines (not the omni-* systems) — operator-locked count</h3>
+      <div class="head">The "17 language engines" are encoding/dialect engines (glyph, transport, verb-noun, tuple, BEHCS-1024, quant, shannon, hot-path), glued by the pinned omnilanguage encoder GLYPH-GENESIS.js. The count 17 is fabric-queried CANON, operator-locked. NOT the omni-SYSTEM taxonomy (13 confirmed + 1 phantom) — only omnidispatcher (eng7) + omni-shannon (eng11) overlap.</div>
+      <div class="nums">
+        <div class="num"><div class="v">17</div><div class="l">language engines (locked)</div></div>
+        <div class="num"><div class="v">6 / 11</div><div class="l">live / on-disk</div></div>
+        <div class="num"><div class="v">8</div><div class="l">GLYPH-GENESIS output symbols</div></div>
+        <div class="num"><div class="v">1024 / 60</div><div class="l">BEHCS radix / tuple dim</div></div>
+        <div class="num"><div class="v">2592 / 93312</div><div class="l">shannon v4 / v5 beats</div></div>
+        <div class="num"><div class="v">≥94</div><div class="l">ALPHABET corruption onset idx</div></div>
+      </div>
+      <ul class="facts">
+        <li><b>Locked count</b> <span class="cn">[CANON]</span> found via fabric query (wf wtbmqrskz, NOT grep); operator "remember 17 languages — the count is canon, locked".</li>
+        <li><b>Pinned encoder</b> <span class="cn">[CANON]</span> GLYPH-GENESIS.js: glyph(key)=sha256(key) looped 8× over the 256-symbol IX-700 ALPHABET → byte-identical anywhere; NO JSON on hot path.</li>
+        <li><b>Honest gaps</b> <span class="mt">[MEASURED]</span> ZETA 4th quant axis LAW-defined NOT built; Shannon GATE is fake-green (passes all); GLYPH-GENESIS ALPHABET corrupted at index ≥94 (Falcon-canon remap planned, deferred).</li>
+        <li><b>Proof axis</b> <span class="cn">[CANON]</span> "16 levels × 17 engines × tuples × verb × noun" computed as exact BigInt, published PR#4→main 336fc8b.</li>
+        <li><b>Live verifier note</b> <span class="mt">[MEASURED]</span> council_query fired UNSIGNED (advisory ACK only) — canon rests on the pinned census, not a live signed verdict.</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- ============ PROVENANCE FOOTER ============ -->
+  <footer class="prov">
+    <h3>Provenance</h3>
+    <p>Generated by <b>acer</b> seat (cohort ACER-PID-H740C) on 2026-06-22. <span class="e0">E = 0</span> — read-only gather: nothing fired, no daemon restarted, no run cranked, no write to the fabric / cosign chain, no git push. Live verifier this session: asolaria-fabric :4949 ok=true, apex COL-ASOLARIA, operator_pair OP-JESSE / OP-RAYSSA, uptime ~218k–223k s; council_query fired but returned <b>UNSIGNED</b> (advisory ACK only — authority lives on :4952 vote-quorum / :4953 cosign, head seq3572).</p>
+    <p><b>Tag legend:</b>
+      <span class="tag measured">MEASURED</span> = read / verified live this session ·
+      <span class="tag canon">CANON</span> = operator / system-affirmed ·
+      <span class="tag mixed">MIXED</span> = part live, part on-disk / gated ·
+      <span class="tag unverified">UNVERIFIED</span> = gather was uncertain (shown honestly, not invented).</p>
+    <p>Honest frame: <i>IT is slices</i> — an addressing / routing geometry over borrowed + frozen intelligence slices; advancement needs an operator-gated engine crank E ≠ 0. Addressing capacity (10¹⁸⁰ per 60-tuple) is NOT materialized storage. The 81,434-surface registry is the larger population the named slices (967 / 726 / 6,112) project from.</p>
+    <p class="gate">⚠ This is a dashboard VIEW. Wiring it into the live AgentTerms fabric ingest is the GATED step — bind matrix E (local_engine) to the S04 named-agent registry + D:/PID-Office, and Q (swarm_queue) to the SHHERMCOUNTER rows + S04 lanes, register cold-path dashboards each with receipt/route/feed-sha/owner/vantage before any unified shadow. Nothing here has been minted, launched, or ingested.</p>
+  </footer>
+
+</div>
+</body>
+</html>
