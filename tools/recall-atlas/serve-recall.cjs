@@ -10,9 +10,12 @@ const BIND = process.env.ASOLARIA_RECALL_BIND || '127.0.0.1';
 const COLONY = process.env.ASOLARIA_RECALL_COLONY || 'liris';
 const OWNER_PID = process.env.ASOLARIA_RECALL_OWNER_PID || 'OP-RAYSSA-PID';
 const DIR = process.env.ASOLARIA_RECALL_DIR || 'C:/tmp/asolaria-unified-archaeology';
-const HBP = path.join(DIR, 'ASOLARIA-LIRIS-RECALL.hbp');
-const HBI = path.join(DIR, 'ASOLARIA-LIRIS-RECALL.hbi');
-const SUMMARY = path.join(DIR, 'SUMMARY-LIRIS.json');
+// Colony-derived basename: each colony serves its own corpus without filename collision.
+// Defaults preserve the original liris deployment: ASOLARIA-LIRIS-RECALL.
+const BASENAME = process.env.ASOLARIA_RECALL_BASENAME || `ASOLARIA-${COLONY.toUpperCase()}-RECALL`;
+const HBP = path.join(DIR, `${BASENAME}.hbp`);
+const HBI = path.join(DIR, `${BASENAME}.hbi`);
+const SUMMARY = path.join(DIR, `SUMMARY-${COLONY.toUpperCase()}.json`);
 const KEY_FILE = process.env.ASOLARIA_RECALL_KEY_FILE
   || path.join(process.env.USERPROFILE || process.env.HOME || '.', '.asolaria', 'recall.key');
 const SHARED_KEY = loadSecret();
@@ -24,20 +27,58 @@ const LEVEL_FEDERATION = 5;
 const LEVEL_OWNER_PRIVATE = 9;
 const LINK_GRANTS = parseGrants(process.env.ASOLARIA_RECALL_GRANTS
   || ALLOWED_OWNER_PIDS.map(pid => `${pid}:${LEVEL_OWNER_PRIVATE}`).join(','));
+// Comprehensive PII/secret path fragments, mirrored from Acer Rust level_tag after the
+// 2026-06-22 full 591,286-row audit. Conservative by design: false positives only
+// over-privatize rows; false negatives leak. Narrow slash-only forms are avoided so
+// bare dirs/files also classify owner-private (for example ".asolaria", "dcim.json").
 const PII_PATH_FRAGMENTS = [
-  'legal/',
+  // legal / financial / customer / personal docs
+  'legal',
   'evidence-package',
+  'evidence',
   'google-support-refund',
   'support-refund-complaints',
   'refund-complaint',
-  '/dcim/',
+  'refund',
+  'bank',
+  'invoice',
+  'financial',
+  'paypal',
+  'zelle',
+  'passport',
+  'cnpj',
+  'cpf',
+  'whatsapp-rayssa',
+  // secrets / keys / vault / credentials
   'beast-keys',
+  'backup-keys',
   'decrypted-vault',
+  'vault',
   'charm_',
   'private-key',
+  'privatekey',
   'recall.key',
-  '.asolaria/',
+  '.pem',
+  '.key',
+  '.pk8',
+  '.kdbx',
+  '.keystore',
+  '.jks',
+  'id_rsa',
+  'id_ed25519',
+  'wallet.dat',
+  'seed-phrase',
+  'seed_phrase',
+  'mnemonic',
   'credential',
+  'secret',
+  'password',
+  'passwd',
+  '.asolaria',
+  // personal-device dumps
+  'dcim',
+  'sdcard',
+  'falcon-dump',
   'phone-dump',
 ];
 const PII_CONTENT_FRAGMENTS = [

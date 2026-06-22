@@ -49,6 +49,18 @@ If neither is set, it defaults to:
 C:\Users\rayss\.asolaria\recall.key
 ```
 
+Corpus filenames are colony-derived by default:
+
+```text
+ASOLARIA-${ASOLARIA_RECALL_COLONY}-RECALL.hbi
+ASOLARIA-${ASOLARIA_RECALL_COLONY}-RECALL.hbp
+SUMMARY-${ASOLARIA_RECALL_COLONY}.json
+```
+
+For Liris, the default colony remains `liris`, so the original filenames stay
+`ASOLARIA-LIRIS-RECALL.*` and `SUMMARY-LIRIS.json`. A colony can override the basename with
+`ASOLARIA_RECALL_BASENAME`.
+
 ## Peer Search
 
 Set peers as a comma-separated list:
@@ -76,6 +88,12 @@ The engine mirrors Acer's Rust `level_tag` contract:
 
 PII rules win before public-canon rules. A row matching private/legal/customer/key patterns is
 owner-private even if another path fragment looks public.
+
+The owner-private path fragments are intentionally broad. Acer's 2026-06-22 full-corpus audit
+found that metadata-only rows do not reliably trigger content/long-digit checks, so path terms
+such as `legal`, `bank`, `.pem`, `.key`, `vault`, `secret`, `password`, `.asolaria`, `dcim`,
+`sdcard`, and `falcon-dump` are classified as owner-private. A false positive only hides a row
+from public search; a false negative can leak.
 
 Unauthenticated callers can use:
 
