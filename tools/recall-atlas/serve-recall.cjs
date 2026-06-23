@@ -456,6 +456,90 @@ function json(res, obj, status = 200) {
   res.end(body);
 }
 
+function hbpEscape(value) {
+  return String(value ?? '')
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n')
+    .replace(/\|/g, '%7C');
+}
+
+function hbpLine(kind, fields) {
+  const parts = [kind];
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined || value === null) continue;
+    parts.push(`${key}=${hbpEscape(value)}`);
+  }
+  parts.push('json=0');
+  return `${parts.join('|')}\n`;
+}
+
+function hbp(res, body, status = 200) {
+  res.writeHead(status, {
+    'content-type': 'text/plain; charset=utf-8',
+    'cache-control': 'no-store',
+  });
+  res.end(body);
+}
+
+function rowSha16(row) {
+  return crypto.createHash('sha256').update(String(row || '')).digest('hex').slice(0, 16);
+}
+
+function hbpHealth(status) {
+  let body = hbpLine('HILBRAHEALTH', {
+    colony: status.colony,
+    owner_pid: status.owner_pid,
+    bind: status.bind,
+    port: status.port,
+    rows: status.rows,
+    key_configured: status.auth.key_configured ? 1 : 0,
+    peers: status.peers.length,
+  });
+  body += hbpLine('HILBRAIDX', {
+    enabled: status.search_index.enabled ? 1 : 0,
+    schema: status.search_index.schema || '',
+    rows: status.search_index.rows || 0,
+    terms: status.search_index.terms || 0,
+    postings: status.search_index.postings || 0,
+    built_ms: status.search_index.built_ms || 0,
+    json_hot_path: status.search_index.json_hot_path ? 1 : 0,
+  });
+  for (const peer of status.peers) {
+    body += hbpLine('HILBRAPEER', { name: peer.name, base: peer.base });
+  }
+  return body;
+}
+
+function hbpSearch(colony, access, result) {
+  let body = hbpLine('HILBRASEARCH', {
+    colony,
+    q: result.q,
+    count: result.count,
+    max_level: result.max_level,
+    mode: result.mode || 'unknown',
+    index_schema: result.index_schema || '',
+    candidate_count: result.candidate_count ?? '',
+    access_mode: access.mode || '',
+    access_max_level: access.max_level ?? '',
+    grant_level: access.grant_level ?? '',
+  });
+  for (let i = 0; i < result.matches.length; i += 1) {
+    const match = result.matches[i];
+    const idx = match.index || {};
+    body += hbpLine('HILBRAMATCH', {
+      i,
+      level: match.level,
+      pid: idx.pid,
+      bh: idx.bh,
+      path: idx.path,
+      off: idx.off,
+      len: idx.len,
+      row_sha16: rowSha16(match.row),
+    });
+  }
+  return body;
+}
+
 function isLoopback(remoteAddress) {
   return remoteAddress === '127.0.0.1'
     || remoteAddress === '::1'
@@ -831,8 +915,13 @@ http.createServer(async (req, res) => {
     }
     if (u.pathname === '/') return html(res);
     if (u.pathname === '/api/health') return json(res, publicStatus());
+    if (u.pathname === '/api/health.hbp') return hbp(res, hbpHealth(publicStatus()));
     if (u.pathname === '/api/public/search') {
       return json(res, { colony: COLONY, access: { mode: 'public', max_level: LEVEL_PUBLIC }, ...searchLocal(u.query.q, u.query.limit, LEVEL_PUBLIC) });
+    }
+    if (u.pathname === '/api/public/search.hbp') {
+      const access = { mode: 'public', max_level: LEVEL_PUBLIC };
+      return hbp(res, hbpSearch(COLONY, access, searchLocal(u.query.q, u.query.limit, LEVEL_PUBLIC)));
     }
     if (u.pathname === '/api/summary') {
       const auth = requireAuth(req, res, 'summary');
@@ -865,6 +954,13 @@ http.createServer(async (req, res) => {
       const level = effectiveLevel(auth, u.query.level);
       if (!level.ok) return accessDenied(res, auth, level);
       return json(res, { colony: COLONY, access: level, ...searchLocal(u.query.q, u.query.limit, level.max_level) });
+    }
+    if (u.pathname === '/api/search.hbp') {
+      const auth = requireAuth(req, res, 'search');
+      if (!auth) return;
+      const level = effectiveLevel(auth, u.query.level);
+      if (!level.ok) return accessDenied(res, auth, level);
+      return hbp(res, hbpSearch(COLONY, level, searchLocal(u.query.q, u.query.limit, level.max_level)));
     }
     if (u.pathname === '/api/search-all') {
       const auth = requireAuth(req, res, 'search-all');
