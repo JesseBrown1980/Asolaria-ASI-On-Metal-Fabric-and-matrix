@@ -153,8 +153,8 @@ svg{width:100%;height:auto;display:block;border:1px solid var(--line);border-rad
     }
   ],
   "anchors": [
-    {"id": "usb", "name": "USB SOVLINUX 2TB", "kind": "sovereignty cold-storage", "role": "master backup · anchor #1", "prov": "measured", "owner": "physical (liris-side)"},
-    {"id": "github", "name": "GitHub", "kind": "distributed durable", "role": "public-cosign anchor / mediator", "prov": "measured", "owner": "operator-auth-gated writes"}
+    {"id": "usb", "name": "USB SOVLINUX 2TB", "kind": "sovereignty cold-storage", "role": "ACER-side · master backup · anchor #1", "prov": "measured", "owner": "physical · acer-side (OP-JESSE-PID) — liris has none", "owner_colony": "acer"},
+    {"id": "github", "name": "GitHub", "kind": "distributed durable", "role": "public-cosign anchor / mediator (shared)", "prov": "measured", "owner": "operator-auth-gated writes"}
   ],
   "links": [
     {
@@ -207,7 +207,7 @@ svg{width:100%;height:auto;display:block;border:1px solid var(--line);border-rad
   const colSpan = Math.min(W-360, colN*300);
   const colGap = colN>1 ? colSpan/(colN-1) : 0;
   const colX = i => colN===1 ? W/2 : (W/2 - colSpan/2 + i*colGap);
-  const H = 470;
+  const H = 500;
   const tierColor = name => (D.tiers.find(t=>t.name===name)||{}).color || 'var(--accent)';
 
   function box(x,y,w,h,fill,stroke){return `<rect class="nbox" x="${x-w/2}" y="${y}" width="${w}" height="${h}" rx="10" fill="${fill}" stroke="${stroke}" stroke-width="1.4"/>`;}
@@ -223,8 +223,7 @@ svg{width:100%;height:auto;display:block;border:1px solid var(--line);border-rad
     const a=D.colonies.findIndex(c=>c.id===lk.from), b=D.colonies.findIndex(c=>c.id===lk.to);
     if(a>=0&&b>=0){ svg+=`<line x1="${colX(a)}" y1="${colY+62}" x2="${colX(b)}" y2="${colY+62}" stroke="var(--green)" stroke-dasharray="6 5" stroke-width="2"/>`;}
   });
-  // anchors column
-  D.anchors.forEach((an,i)=>{ svg+=`<line x1="${W/2}" y1="${colY+30}" x2="${anchorX}" y2="${colY+10+i*70}" stroke-dasharray="3 4"/>`; });
+  // (anchor edges are drawn owner-aware in the anchors section below)
   svg += `</g>`;
 
   // apex
@@ -247,13 +246,28 @@ svg{width:100%;height:auto;display:block;border:1px solid var(--line);border-rad
   // cross-link label
   if(D.links[0]){ svg += txt(W/2,colY+58,'⇄ HMAC cross-fabric search',{size:11,fill:'var(--green)',mono:true}); }
 
-  // anchors
-  D.anchors.forEach((an,i)=>{
-    const y=colY+10+i*70;
+  // anchors — a row BELOW the colonies; each tied to its OWNER colony (solid gold edge,
+  // box under that colony) or shared (dashed, centered). This keeps acer-owned storage
+  // visually under ACER, never floating next to another colony.
+  const anchorY = colY + 150;
+  const sharedIdxs = D.anchors.map((an,i)=>an.owner_colony?-1:i).filter(i=>i>=0);
+  const anchorPos = D.anchors.map((an,i)=>{
+    const oi = an.owner_colony ? D.colonies.findIndex(c=>c.id===an.owner_colony) : -1;
+    if(oi>=0) return {an,oi,x:colX(oi)};
+    const k = sharedIdxs.indexOf(i), n=sharedIdxs.length;
+    return {an,oi,x: n<=1 ? W/2 : (W/2 - 120*(n-1)/2 + k*120)};
+  });
+  anchorPos.forEach(p=>{
+    const owned=p.oi>=0, srcX = owned?colX(p.oi):W/2;
+    svg += `<line x1="${srcX}" y1="${colY+84}" x2="${p.x}" y2="${anchorY}" fill="none" stroke="${owned?'var(--gold)':'var(--line2)'}" stroke-width="${owned?2:1.2}" ${owned?'':'stroke-dasharray="3 4"'}/>`;
+  });
+  anchorPos.forEach(p=>{
+    const an=p.an, owned=p.oi>=0;
     svg += `<g class="node" data-kind="anchor" data-id="${an.id}">`;
-    svg += box(anchorX,y,210,48,'#0d1320','var(--line2)');
-    svg += txt(anchorX,y+20,an.name,{size:12,weight:600,fill:'var(--aqua)'});
-    svg += txt(anchorX,y+37,an.role,{size:10.5,fill:'var(--dim)'});
+    svg += box(p.x,anchorY,214,owned?54:48,'#0d1320', owned?'var(--gold)':'var(--line2)');
+    svg += txt(p.x,anchorY+19,an.name,{size:12,weight:600,fill:owned?'var(--gold)':'var(--aqua)'});
+    svg += txt(p.x,anchorY+35,an.role,{size:9.5,fill:'var(--dim)'});
+    if(owned) svg += txt(p.x,anchorY+49,'owned by '+esc(D.colonies[p.oi].name)+' · not liris',{size:8.5,fill:'var(--gold)'});
     svg += `</g>`;
   });
 
