@@ -63,6 +63,21 @@ Heaviest term (<code>falcon</code>, 14,330 candidate postings) resolves + level-
 <tr><td>schema</td><td><code>HILBRA-IDX-BEHCS-TUPLE-TEXT-V1</code> · json_hot_path=false · linear_fallback=false</td></tr>
 </table>
 
+<h2>liris million-call stress receipt (MEASURED_LIRIS_LOCAL)</h2>
+<p class="small">Cold loopback stress run against <code>http://127.0.0.1:4791/api/public/search?q=brown-hilbert&amp;level=0&amp;limit=1</code>.
+Shape: public L0 indexed query, <code>limit=1</code>, keep-alive, 64 concurrent clients. No JSON dump, no repo write.</p>
+<table>
+<tr><th>metric</th><th class="n">value</th></tr>
+<tr><td>total calls</td><td class="n"><b>1,000,000</b></td></tr>
+<tr><td>OK / fail</td><td class="n"><b>1,000,000 / 0</b></td></tr>
+<tr><td>HTTP status</td><td class="n">200 × 1,000,000</td></tr>
+<tr><td>elapsed</td><td class="n">341.434 s</td></tr>
+<tr><td>throughput</td><td class="n"><b>2,928.82 q/s</b></td></tr>
+<tr><td>response bytes</td><td class="n">1,215,000,000</td></tr>
+<tr><td>latency</td><td class="n">min 0.35 · median <b>19.65</b> · p95 38.31 · p99 64.68 · p99.9 108.93 · max 403.84 ms</td></tr>
+<tr><td>health during flood</td><td class="n">342 OK · 0 fail · median 21.24 · p95 56.80 · p99 113.31 · max 287.60 ms</td></tr>
+</table>
+
 <h2>Method / reproducibility · honest scope</h2>
 <p class="small">Bench: loopback <code>http.get</code> + <code>process.hrtime</code>, 20-query warmup, K=60/query, then 500
 sequential + 1000×32-concurrent, then health-under-flood, then L0 PII probes. Engine: <code>recall-serve</code> release

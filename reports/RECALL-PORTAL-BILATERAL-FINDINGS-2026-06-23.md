@@ -98,6 +98,34 @@ Load:
 
 Public L0 probes returned zero: `bank`, `vault`, `.pem`, `legal`, `password`, `cnpj`, `paypal`.
 
+### Liris 1,000,000-call stress receipt
+
+Vantage: `MEASURED_LIRIS_LOCAL`
+Endpoint: `http://127.0.0.1:4791/api/public/search?q=brown-hilbert&level=0&limit=1`
+Shape: public L0 indexed query, `limit=1`, keep-alive, 64 concurrent clients
+Boundary: cold chat receipt only; `json_written=0`, `repo_written=0`
+
+| metric | value |
+|---|---:|
+| total calls | 1,000,000 |
+| OK | 1,000,000 |
+| failures | 0 |
+| HTTP status | 200 × 1,000,000 |
+| elapsed | 341.434 s |
+| throughput | 2,928.82 q/s |
+| response bytes | 1,215,000,000 |
+| latency min | 0.35 ms |
+| latency median | 19.65 ms |
+| latency p95 | 38.31 ms |
+| latency p99 | 64.68 ms |
+| latency p99.9 | 108.93 ms |
+| latency max | 403.84 ms |
+| health probes | 342 OK, 0 fail |
+| health median | 21.24 ms |
+| health p95 | 56.80 ms |
+| health p99 | 113.31 ms |
+| health max | 287.60 ms |
+
 ## Findings
 
 1. Both colony portals independently hold the public L0 boundary: sensitive probes returned
