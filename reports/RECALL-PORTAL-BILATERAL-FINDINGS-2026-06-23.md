@@ -18,6 +18,17 @@ Each colony benchmarked its own live portal from its own seat:
 The cross-colony comparison is useful but not same-host/same-corpus. The same-host Acer
 comparison remains the clean Rust-vs-Node migration number.
 
+## Claim Boundary
+
+This receipt does **not** claim "world's fastest full-text search engine" or global SOTA.
+That would require normalized same-machine benchmarks against Tantivy, Lucene, PISA, and
+ideally Meilisearch on the same corpus, same query sequence, equivalent top-1/token-AND
+semantics, correctness hashes, cold and warm runs, identical keep-alive/concurrency, and
+QPS, p50/p95/p99, CPU, RAM, index size, and build-time reporting.
+
+Defensible label: **SOTA-class specialized recall; best-known measured implementation
+within Asolaria; global SOTA not yet independently benchmarked.**
+
 ## Bilateral Summary
 
 | colony | engine | rows | terms | median query | concurrency | health under flood | L0 PII |

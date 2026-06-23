@@ -26,6 +26,14 @@ a{color:var(--acc)}code{color:#ffd28a}
 p99 <b>4.15 ms</b>, <b>1,336 queries/s</b> concurrent, <b>never stalls under load</b>, public tier <b>provably PII-free</b>.
 ~<b>40× faster</b> than the prior Node inverted index (~56–67 ms); unbounded vs the Node <i>linear</i> scan (event-loop-stalls).</div>
 
+<h2>Claim Boundary</h2>
+<p><b>Defensible label:</b> SOTA-class specialized recall; best-known measured implementation within Asolaria;
+global SOTA not yet independently benchmarked.</p>
+<p class="small">Not claimed: world's fastest full-text search engine. A global/SOTA claim requires normalized same-machine
+benchmarks against Tantivy, Lucene, PISA, and ideally Meilisearch on the same corpus and query sequence, equivalent
+top-1/token-AND semantics, correctness hashes, cold and warm runs, identical keep-alive/concurrency, and QPS,
+p50/p95/p99, CPU, RAM, index size, and build-time reporting.</p>
+
 <h2>Bilateral — both colony portals MEASURED (federation findings)</h2>
 <p class="small">Each colony benchmarked its OWN live portal from its OWN seat, independent scripts.</p>
 <table>
