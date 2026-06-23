@@ -63,6 +63,22 @@ Heaviest term (<code>falcon</code>, 14,330 candidate postings) resolves + level-
 <tr><td>schema</td><td><code>HILBRA-IDX-BEHCS-TUPLE-TEXT-V1</code> · json_hot_path=false · linear_fallback=false</td></tr>
 </table>
 
+<h2>acer million-call stress receipt (MEASURED_ACER)</h2>
+<p class="small">Cold operator receipt against the Rust <code>:4796</code> public L0 query mix.
+Shape: 1,000,000 calls, 56 concurrent clients, <code>connection: close</code> response path (fresh TCP per request).
+No corpus, key, or JSON dump published.</p>
+<table>
+<tr><th>metric</th><th class="n">value</th></tr>
+<tr><td>total calls</td><td class="n"><b>1,000,000</b></td></tr>
+<tr><td>OK / 503 / fail</td><td class="n"><b>1,000,000 / 0 / 0</b></td></tr>
+<tr><td>wall-clock</td><td class="n">739.3 s (12.3 min)</td></tr>
+<tr><td>throughput</td><td class="n"><b>1,353 q/s</b></td></tr>
+<tr><td>latency</td><td class="n">min 4.18 · median <b>41.35</b> · p90 47.52 · p95 49.98 · p99 59.88 · p99.9 93.29 · max 771.77 · mean 41.39 ms</td></tr>
+</table>
+<p class="small"><b>Interpretation:</b> 1,000,000/1,000,000 succeeded with zero drops or stalls.
+The 41 ms median is queue/transport-bound, not search-compute-bound: 56 clients / 1,353 q/s = 41.4 ms by Little's Law,
+matching the observed median. The warm 1.47 ms receipt above remains the clean Rust search-compute number.</p>
+
 <h2>liris million-call stress receipt (MEASURED_LIRIS_LOCAL)</h2>
 <p class="small">Cold loopback stress run against <code>http://127.0.0.1:4791/api/public/search?q=brown-hilbert&amp;level=0&amp;limit=1</code>.
 Shape: public L0 indexed query, <code>limit=1</code>, keep-alive, 64 concurrent clients. No JSON dump, no repo write.</p>
@@ -77,6 +93,13 @@ Shape: public L0 indexed query, <code>limit=1</code>, keep-alive, 64 concurrent 
 <tr><td>latency</td><td class="n">min 0.35 · median <b>19.65</b> · p95 38.31 · p99 64.68 · p99.9 108.93 · max 403.84 ms</td></tr>
 <tr><td>health during flood</td><td class="n">342 OK · 0 fail · median 21.24 · p95 56.80 · p99 113.31 · max 287.60 ms</td></tr>
 </table>
+
+<h2>Transport finding — keep-alive is the next lever</h2>
+<p class="small">Measured facts: Acer Rust ran the million-call stress with <code>connection: close</code>
+(1,353 q/s, 41.35 ms median). Liris ran its local million-call stress with keep-alive
+(2,928.82 q/s, 19.65 ms median). Engineering inference: connection reuse materially raises sustained portal throughput
+and collapses queueing latency. Migration posture remains additive: add persistent-connection support on the Rust test
+port, re-measure, publish the cold receipt, then gate any swap.</p>
 
 <h2>Method / reproducibility · honest scope</h2>
 <p class="small">Bench: loopback <code>http.get</code> + <code>process.hrtime</code>, 20-query warmup, K=60/query, then 500

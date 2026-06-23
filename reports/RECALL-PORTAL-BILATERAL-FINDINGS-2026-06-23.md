@@ -53,6 +53,35 @@ Measured findings:
 
 Public L0 probes returned zero: `bank`, `vault`, `.pem`, `legal`, `password`, `cnpj`, `paypal`.
 
+### Acer 1,000,000-call stress receipt
+
+Vantage: `MEASURED_ACER`  
+Endpoint shape: Rust `:4796` public L0 query mix over loopback  
+Shape: 56 concurrent clients; engine response path used `connection: close` (fresh TCP per request)  
+Boundary: cold chat/operator receipt; no corpus, key, or JSON dump published
+
+| metric | value |
+|---|---:|
+| total calls | 1,000,000 |
+| OK | 1,000,000 |
+| 503 / dropped | 0 |
+| failures | 0 |
+| wall-clock | 739.3 s |
+| throughput | 1,353 q/s |
+| latency min | 4.18 ms |
+| latency median | 41.35 ms |
+| latency p90 | 47.52 ms |
+| latency p95 | 49.98 ms |
+| latency p99 | 59.88 ms |
+| latency p99.9 | 93.29 ms |
+| latency max | 771.77 ms |
+| latency mean | 41.39 ms |
+
+Interpretation: the million-call result proves sustained robustness: 1,000,000/1,000,000
+requests succeeded with zero drops or stalls. The 41 ms median is queue/transport-bound, not
+search-compute-bound: 56 clients / 1,353 q/s = 41.4 ms by Little's Law, matching the observed
+median. The warm compute receipt above remains the clean Rust search-compute number.
+
 Scope note: Acer also measured the same-host migration baseline: Node-indexed was about
 56-67 ms on the same 591k-row corpus, while Rust was 1.47 ms median. That is about 40x
 faster on the clean same-host/same-corpus comparison. The older Node-linear path stalls
@@ -126,6 +155,18 @@ Boundary: cold chat receipt only; `json_written=0`, `repo_written=0`
 | health p99 | 113.31 ms |
 | health max | 287.60 ms |
 
+## Transport Finding: Keep-Alive Is The Next Throughput Lever
+
+Raw measured facts:
+
+- Acer Rust million-call run: `connection: close`, 56 clients, 1,353 q/s, 41.35 ms median.
+- Liris local million-call run: keep-alive, 64 clients, 2,928.82 q/s, 19.65 ms median.
+
+Engineering inference: connection reuse materially raises sustained portal throughput and
+collapses queueing latency. This does not mean the old system is retired. It means the next
+Rust/8-byte-host migration cell should add keep-alive/persistent-connection support on the
+test port, re-measure, and only then consider any cutover gate.
+
 ## Findings
 
 1. Both colony portals independently hold the public L0 boundary: sensitive probes returned
@@ -137,7 +178,9 @@ Boundary: cold chat receipt only; `json_written=0`, `repo_written=0`
    it is strong federation evidence.
 4. The clean migration proof is Acer same-host/same-corpus: Node-indexed about 56-67 ms to
    Rust 1.47 ms median, with health staying responsive under load.
-5. Rust `recall-serve` remains a gated cutover candidate, not a blind replacement. Node
+5. The million-call receipts prove sustained portal robustness on both seats; the keep-alive
+   vs connection-close split identifies the next measured Rust throughput improvement.
+6. Rust `recall-serve` remains a gated cutover candidate, not a blind replacement. Node
    `:4791` stays live until robustness/parity gates and bilateral review clear.
 
 ## Publication Boundaries
