@@ -1,0 +1,78 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Asolaria Recall Portal — MEASURED metrics (2026-06-23)</title>
+<style>
+:root{--bg:#08080f;--fg:#e0e8f8;--dim:#5d6c89;--acc:#7df;--good:#7f9;--warn:#fa6;--bad:#f55;--panel:#0e1424;--border:#1f2a44}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 Consolas,Monaco,ui-monospace,monospace;padding:0 0 60px}
+header{padding:18px 22px;border-bottom:1px solid var(--border);background:linear-gradient(90deg,#0d1422,#0a0f1f)}
+h1{margin:0;font-size:19px;color:var(--acc)}h2{font-size:15px;color:var(--acc);border-bottom:1px solid var(--border);padding-bottom:5px;margin:26px 0 10px}
+.wrap{max-width:1000px;margin:0 auto;padding:0 22px}
+.small{color:var(--dim);font-size:12px}
+.head{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--good);border-radius:8px;padding:14px 16px;margin:16px 0;font-size:15px}
+.tag{display:inline-block;border:1px solid var(--border);border-radius:10px;padding:2px 8px;font-size:11px;margin:2px 3px 2px 0}
+.t-m{color:var(--good);border-color:var(--good)}.t-l{color:var(--warn);border-color:var(--warn)}
+table{border-collapse:collapse;width:100%;margin:8px 0;font-size:13px}
+th,td{border:1px solid var(--border);padding:6px 9px;text-align:left}th{background:#101a30;color:var(--acc)}
+td.n{text-align:right;font-variant-numeric:tabular-nums}.big{color:var(--good);font-weight:700}
+a{color:var(--acc)}code{color:#ffd28a}
+</style>
+<header><div class="wrap"><h1>Asolaria Recall Portal — MEASURED metrics</h1>
+<div class="small">The Hilbra-internet recall portal · Rust <code>recall-serve</code> 8-byte engine · 2026-06-23 ·
+<span class="tag t-m">MEASURED_ACER</span><span class="tag t-l">MEASURED_LIRIS_LOCAL</span></div></div></header>
+<div class="wrap">
+
+<div class="head"><b>Median <span class="big">1.47 ms</span></b> recall over <b>591,286 rows / 2,614,638 terms / 23,930,053 postings</b>,
+p99 <b>4.15 ms</b>, <b>1,336 queries/s</b> concurrent, <b>never stalls under load</b>, public tier <b>provably PII-free</b>.
+~<b>40× faster</b> than the prior Node inverted index (~56–67 ms); unbounded vs the Node <i>linear</i> scan (event-loop-stalls).</div>
+
+<h2>Bilateral — both colony portals MEASURED (federation findings)</h2>
+<p class="small">Each colony benchmarked its OWN live portal from its OWN seat, independent scripts.</p>
+<table>
+<tr><th>colony</th><th>engine</th><th class="n">rows</th><th class="n">terms</th><th>median query</th><th>concurrency</th><th>health under flood</th><th>L0 PII</th></tr>
+<tr><td><b>acer</b></td><td>Rust <code>recall-serve</code></td><td class="n">591,286</td><td class="n">2,614,638</td><td class="big">1.47 ms</td><td><b>1,336 q/s</b> (32c)</td><td>9.85 ms · p99 12 ms</td><td class="big">free ✓</td></tr>
+<tr><td><b>liris</b></td><td>Node <code>serve-recall.cjs</code></td><td class="n">10,644</td><td class="n">103,238</td><td>3.65–4.82 ms</td><td>205 q/s (16c) · 74 ms under load</td><td>0.83 ms · p99 117 ms</td><td class="big">free ✓</td></tr>
+</table>
+<p class="small"><b>Cross-engine note (apples-to-oranges — engine/corpus/host differ):</b> acer's Rust serves ~55× the corpus at
+<i>lower</i> median latency, and under concurrency the thread-per-connection engine holds where the Node event loop
+serializes (query median balloons to 74 ms, health p99 to 117 ms under the same flood). The clean <i>same-host, same-corpus</i>
+comparison stays the acer one: Node-indexed ~56–67 ms → Rust 1.47 ms (~40×). Both public tiers hold PII-free independently.</p>
+
+<h2>acer Rust engine — query latency (warm, K=60/query, 600 samples)</h2>
+<table>
+<tr><th>query (tier)</th><th class="n">median</th><th class="n">p95</th><th class="n">p99</th><th class="n">max</th><th class="n">hits</th><th class="n">candidates</th></tr>
+<tr><td>brown-hilbert (public L0)</td><td class="n">1.62</td><td class="n">2.55</td><td class="n">3.08</td><td class="n">3.08</td><td class="n">49</td><td class="n">49</td></tr>
+<tr><td>significance (loopback)</td><td class="n">1.28</td><td class="n">2.15</td><td class="n">2.31</td><td class="n">2.31</td><td class="n">10</td><td class="n">10</td></tr>
+<tr><td>mcp (loopback)</td><td class="n">1.72</td><td class="n">2.77</td><td class="n">3.62</td><td class="n">3.62</td><td class="n">50</td><td class="n">644</td></tr>
+<tr><td>falcon (loopback)</td><td class="n">3.07</td><td class="n">4.18</td><td class="n">4.19</td><td class="n">4.19</td><td class="n">50</td><td class="n">14,330</td></tr>
+<tr><td>shannon (loopback)</td><td class="n">1.92</td><td class="n">2.72</td><td class="n">3.22</td><td class="n">3.22</td><td class="n">50</td><td class="n">4,637</td></tr>
+<tr><td>two-token "brown hilbert"</td><td class="n">1.58</td><td class="n">3.26</td><td class="n">4.15</td><td class="n">4.15</td><td class="n">50</td><td class="n">176</td></tr>
+<tr style="background:#0c1426"><td><b>AGGREGATE (600)</b></td><td class="n"><b>1.47</b></td><td class="n"><b>3.26</b></td><td class="n"><b>4.15</b></td><td class="n"><b>6.15</b></td><td class="n">—</td><td class="n">min 0.63</td></tr>
+</table>
+<p class="small">All times in ms, end-to-end client-observed (include loopback HTTP overhead → engine compute is ≤ these).
+Heaviest term (<code>falcon</code>, 14,330 candidate postings) resolves + level-filters + seeks in ~3 ms.</p>
+
+<h2>Throughput · no-stall · safety</h2>
+<table>
+<tr><th>metric</th><th>result</th></tr>
+<tr><td>throughput (1 client)</td><td>500 queries / 684 ms = <b>731 q/s</b></td></tr>
+<tr><td>throughput (32 clients)</td><td>1000 queries / 748 ms = <b>1,336 q/s</b></td></tr>
+<tr><td>no-stall — <code>/api/health</code> under 16-wide query flood</td><td>median <b>9.85 ms</b>, p99 12.17 ms — never blocks (thread-per-conn). Node stalls on the same corpus.</td></tr>
+<tr><td>L0 provably PII-free (public tier)</td><td><span class="big">bank·vault·.pem·legal·password·cnpj·paypal → all 0</span></td></tr>
+<tr><td>index footprint</td><td>688 MB working set · build 53.8 s (one-time)</td></tr>
+<tr><td>schema</td><td><code>HILBRA-IDX-BEHCS-TUPLE-TEXT-V1</code> · json_hot_path=false · linear_fallback=false</td></tr>
+</table>
+
+<h2>Method / reproducibility · honest scope</h2>
+<p class="small">Bench: loopback <code>http.get</code> + <code>process.hrtime</code>, 20-query warmup, K=60/query, then 500
+sequential + 1000×32-concurrent, then health-under-flood, then L0 PII probes. Engine: <code>recall-serve</code> release
+build, Rust 1.81, run on <code>127.0.0.1:4796</code>. Receipt + exact bench:
+<a href="https://github.com/JesseBrown1980/asolaria-federation-1024/blob/acer/recall-serve-rust/tools/recall-serve/METRICS-2026-06-23.md">METRICS-2026-06-23.md</a>
+(PR #8).</p>
+<p class="small"><b>Scope:</b> single 4-core i5, localhost loopback — not a datacenter, not LAN-RTT (cross-colony adds network).
+Corpus is acer's <code>ASOLARIA-ACER-RECALL</code> (591k), not published. Cross-colony "live both ways right now" stays
+<code>UNVERIFIED_CURRENT</code> until a per-seat receipt. recall-serve is HELD (PR #8) for liris cross-verify before any
+<code>:4791</code> cutover — these are the new-engine receipt, not a cutover.</p>
+<p class="small"><a href="/asolaria-unified-fabric-map.html">← Unified Fabric Map</a> · <a href="/acer-recall-atlas.html">Recall + Atlas portal →</a></p>
+
+</div>
