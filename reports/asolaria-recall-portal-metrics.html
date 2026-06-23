@@ -79,6 +79,24 @@ No corpus, key, or JSON dump published.</p>
 The 41 ms median is queue/transport-bound, not search-compute-bound: 56 clients / 1,353 q/s = 41.4 ms by Little's Law,
 matching the observed median. The warm 1.47 ms receipt above remains the clean Rust search-compute number.</p>
 
+<h2>acer keep-alive + json=0 tuple-text upgrade (MEASURED_ACER)</h2>
+<p class="small">PR #8 head <code>4395d7f</code>, CI green. Rust <code>:4796</code> public L0 <code>.hbp</code>
+tuple-text hot path (<code>HILBRA*</code> lines), keep-alive, 64 clients, <code>limit=10</code>. Dashboard now reads tuple-text.
+No corpus, key, or JSON dump published; no <code>:4791</code> cutover claimed.</p>
+<table>
+<tr><th>metric</th><th class="n">connection-close</th><th class="n">keep-alive json=0 tuple-text</th><th class="n">gain</th></tr>
+<tr><td>total / OK / fail / 503</td><td class="n">1,000,000 / 1,000,000 / 0 / 0</td><td class="n"><b>1,000,000 / 1,000,000 / 0 / 0</b></td><td class="n">held</td></tr>
+<tr><td>wall-clock</td><td class="n">739.3 s</td><td class="n"><b>237.0 s</b></td><td class="n">3.1x faster</td></tr>
+<tr><td>throughput</td><td class="n">1,353 q/s</td><td class="n"><b>4,220 q/s</b></td><td class="n">3.1x</td></tr>
+<tr><td>latency p50</td><td class="n">41.35 ms</td><td class="n"><b>14.43 ms</b></td><td class="n">2.9x lower</td></tr>
+<tr><td>latency p95 / p99</td><td class="n">49.98 / 59.88 ms</td><td class="n"><b>20.57 / 27.12 ms</b></td><td class="n">~2.2x lower</td></tr>
+<tr><td>latency p99.9 / max</td><td class="n">93.29 / 771.77 ms</td><td class="n"><b>46.13 / 180.25 ms</b></td><td class="n">~4x lower max</td></tr>
+<tr><td>JSON responses</td><td class="n">JSON boundary</td><td class="n"><b>0</b></td><td class="n">json=0</td></tr>
+</table>
+<p class="small"><b>Read honestly:</b> still throughput-bound, but the ceiling tripled. 64 clients / 4,220 q/s = 15.2 ms,
+matching the observed mean (~15.13 ms). This beats Liris Node keep-alive (2,928.82 q/s, p50 19.65 ms) while serving
+about 55x the corpus.</p>
+
 <h2>liris million-call stress receipt (MEASURED_LIRIS_LOCAL)</h2>
 <p class="small">Cold loopback stress run against <code>http://127.0.0.1:4791/api/public/search?q=brown-hilbert&amp;level=0&amp;limit=1</code>.
 Shape: public L0 indexed query, <code>limit=1</code>, keep-alive, 64 concurrent clients. No JSON dump, no repo write.</p>
@@ -94,12 +112,12 @@ Shape: public L0 indexed query, <code>limit=1</code>, keep-alive, 64 concurrent 
 <tr><td>health during flood</td><td class="n">342 OK · 0 fail · median 21.24 · p95 56.80 · p99 113.31 · max 287.60 ms</td></tr>
 </table>
 
-<h2>Transport finding — keep-alive is the next lever</h2>
+<h2>Transport finding — keep-alive + tuple text is the measured lever</h2>
 <p class="small">Measured facts: Acer Rust ran the million-call stress with <code>connection: close</code>
 (1,353 q/s, 41.35 ms median). Liris ran its local million-call stress with keep-alive
-(2,928.82 q/s, 19.65 ms median). Engineering inference: connection reuse materially raises sustained portal throughput
-and collapses queueing latency. Migration posture remains additive: add persistent-connection support on the Rust test
-port, re-measure, publish the cold receipt, then gate any swap.</p>
+(2,928.82 q/s, 19.65 ms median). Acer then applied keep-alive plus <code>.hbp</code> tuple-text and measured
+4,220 q/s, 14.43 ms median, 0 JSON responses. Migration posture remains additive: new Rust test-port cell measured,
+old serving system remains live, any swap stays gated.</p>
 
 <h2>Method / reproducibility · honest scope</h2>
 <p class="small">Bench: loopback <code>http.get</code> + <code>process.hrtime</code>, 20-query warmup, K=60/query, then 500

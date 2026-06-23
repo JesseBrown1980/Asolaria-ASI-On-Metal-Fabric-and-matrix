@@ -82,6 +82,30 @@ requests succeeded with zero drops or stalls. The 41 ms median is queue/transpor
 search-compute-bound: 56 clients / 1,353 q/s = 41.4 ms by Little's Law, matching the observed
 median. The warm compute receipt above remains the clean Rust search-compute number.
 
+### Acer keep-alive + `json=0` tuple-text upgrade
+
+Vantage: `MEASURED_ACER`  
+Engine commit: PR #8 head `4395d7f`  
+Endpoint shape: Rust `:4796` public L0 `.hbp` tuple-text hot path (`HILBRA*` lines)  
+Shape: 64 concurrent clients; keep-alive; `limit=10`; dashboard reads tuple-text; no JSON data path  
+Boundary: operator/Acer receipt plus GitHub PR bytes and green CI; Liris-local LAN endpoint still timed out
+
+| metric | connection-close run | keep-alive `.hbp` tuple-text run | gain |
+|---|---:|---:|---:|
+| total / OK / fail / 503 | 1,000,000 / 1,000,000 / 0 / 0 | 1,000,000 / 1,000,000 / 0 / 0 | held |
+| wall-clock | 739.3 s | 237.0 s | 3.1x faster |
+| throughput | 1,353 q/s | 4,220 q/s | 3.1x |
+| latency p50 | 41.35 ms | 14.43 ms | 2.9x lower |
+| latency p95 / p99 | 49.98 / 59.88 ms | 20.57 / 27.12 ms | about 2.2x lower |
+| latency p99.9 / max | 93.29 / 771.77 ms | 46.13 / 180.25 ms | about 4x lower max |
+| JSON responses | JSON boundary | 0 | `json=0` |
+
+The keep-alive + tuple-text run is still throughput-bound, but at a much higher ceiling:
+64 clients / 4,220 q/s = 15.2 ms, matching the observed mean (~15.13 ms). The engine served
+one million public L0 tuple-text searches with zero failures, zero drops, and zero JSON
+responses. This beats Liris's Node keep-alive run (2,928.82 q/s, p50 19.65 ms) while serving
+about 55x the corpus. It remains additive: no `:4791` cutover is claimed.
+
 Scope note: Acer also measured the same-host migration baseline: Node-indexed was about
 56-67 ms on the same 591k-row corpus, while Rust was 1.47 ms median. That is about 40x
 faster on the clean same-host/same-corpus comparison. The older Node-linear path stalls
@@ -155,17 +179,18 @@ Boundary: cold chat receipt only; `json_written=0`, `repo_written=0`
 | health p99 | 113.31 ms |
 | health max | 287.60 ms |
 
-## Transport Finding: Keep-Alive Is The Next Throughput Lever
+## Transport Finding: Keep-Alive + Tuple Text Is The Measured Throughput Lever
 
 Raw measured facts:
 
 - Acer Rust million-call run: `connection: close`, 56 clients, 1,353 q/s, 41.35 ms median.
 - Liris local million-call run: keep-alive, 64 clients, 2,928.82 q/s, 19.65 ms median.
+- Acer Rust upgraded run: keep-alive + `.hbp` tuple text, 64 clients, 4,220 q/s, 14.43 ms median, 0 JSON responses.
 
-Engineering inference: connection reuse materially raises sustained portal throughput and
-collapses queueing latency. This does not mean the old system is retired. It means the next
-Rust/8-byte-host migration cell should add keep-alive/persistent-connection support on the
-test port, re-measure, and only then consider any cutover gate.
+Engineering result: connection reuse materially raises sustained portal throughput and
+tuple-text keeps the fabric-native `json=0` lane intact. This does not mean the old system is
+retired. It means the Rust/8-byte-host migration cell has advanced on the test port and must
+still pass bilateral review before any cutover gate.
 
 ## Findings
 
@@ -178,8 +203,9 @@ test port, re-measure, and only then consider any cutover gate.
    it is strong federation evidence.
 4. The clean migration proof is Acer same-host/same-corpus: Node-indexed about 56-67 ms to
    Rust 1.47 ms median, with health staying responsive under load.
-5. The million-call receipts prove sustained portal robustness on both seats; the keep-alive
-   vs connection-close split identifies the next measured Rust throughput improvement.
+5. The million-call receipts prove sustained portal robustness on both seats; Acer's applied
+   keep-alive + tuple-text run is now the strongest measured throughput receipt: 4,220 q/s,
+   p50 14.43 ms, 1,000,000/1,000,000 OK, 0 JSON responses.
 6. Rust `recall-serve` remains a gated cutover candidate, not a blind replacement. Node
    `:4791` stays live until robustness/parity gates and bilateral review clear.
 
