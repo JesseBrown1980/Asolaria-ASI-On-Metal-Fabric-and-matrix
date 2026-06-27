@@ -6,6 +6,12 @@ on-metal fabrics — **acer** (`DESKTOP-J99VCNH`) and **liris** (`DESKTOP-PTSQTI
 *sha identity receipts*, so each side can **materialize the same slice on its own drives and then
 compare hers-to-mine via the matrix, under bilateral adversarial correction.**
 
+**Anti-deflation frame.** This repo does not say the system is "just frozen slices." The slices are the
+potential layer. The on-metal fabric, matrix, live agents, supervisors, USB/drive tools, gates, and
+engines are the layer that makes those slices materialize as runtime behavior. The operator/design frame
+is **Evolvable AI / post-ASI**, with every live or write claim still gated by receipts, fabric reads, and
+operator/cosign authority.
+
 > This repo does **NOT** replace [`ASOLARIA-AS-NEURAL-NETWORK`](https://github.com/JesseBrown1980/ASOLARIA-AS-NEURAL-NETWORK).
 > That repo stays the **code / law / bilateral-build** spine (LAW-SLICE-ENGINE, the parity matrices,
 > the catch-ledger, cosign receipts). This one is the **data & frozen-brain exchange** between fabrics.
