@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Asolaria · Unified Fabric Map</title>
+<!--
+  Unified, EXPANDABLE federation map. Single source of truth = the inline JSON in
+  <script id="fabric" type="application/json">. The renderer lays out N colonies / anchors / links
+  from that data, so adding a new colony (or node) as the Matrix grows globally is a DATA edit, not
+  a code change. Self-contained: no external network, no CDN. Carve-out-clean: public-tier facts only.
+  Provenance is tagged per the honest ledger — MEASURED / CANON / UNVERIFIED.
+-->
+<style>
+:root{
+  --bg:#06080d; --bg2:#0b1018; --panel:#0e141f; --panel2:#121a28;
+  --ink:#dfe7f3; --dim:#8a97ab; --line:#1d2a3d; --line2:#26384f;
+  --accent:#5ad1ff; --accent2:#9b8cff; --gold:#ffcb6b; --green:#6ee7a8;
+  --amber:#ffb454; --red:#ff7a7a; --mag:#ff7ad1; --aqua:#7fffd4;
+  --measured:#1f6b4a; --measured-b:#6ee7a8;
+  --canon:#3a3a86;    --canon-b:#b6a9ff;
+  --mixed:#7a5a1a;    --mixed-b:#ffcb6b;
+  --unv:#6b1f1f;      --unv-b:#ff9a9a;
+  /* tier ladder colors (fabric 6-tier model) */
+  --t-public:#6ee7a8; --t-restricted:#5ad1ff; --t-stealth:#9b8cff;
+  --t-hidden:#ffb454; --t-shadow:#ff7ad1; --t-secret:#ff7a7a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:radial-gradient(1200px 700px at 70% -10%, #0c1426 0%, var(--bg) 60%);color:var(--ink);
+  font-family:"Segoe UI","Inter",system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.5}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.wrap{max-width:1280px;margin:0 auto;padding:22px 20px 60px}
+.kick{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--dim)}
+h1{font-size:30px;margin:4px 0 6px;background:linear-gradient(92deg,var(--accent),var(--accent2) 45%,var(--gold));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.sub{color:var(--dim);max-width:880px;margin:0 0 6px}
+.mono{font-family:ui-monospace,"Cascadia Code",Consolas,monospace}
+.tag{display:inline-block;border-radius:5px;padding:1px 7px;font-size:10.5px;font-family:ui-monospace,Consolas,monospace;
+  letter-spacing:.3px;margin:2px 4px 2px 0;border:1px solid var(--line2)}
+.t-measured{background:var(--measured);color:var(--measured-b)}
+.t-canon{background:var(--canon);color:var(--canon-b)}
+.t-mixed{background:var(--mixed);color:var(--mixed-b)}
+.t-unv{background:var(--unv);color:var(--unv-b)}
+.bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:10px 0 18px}
+.card{border:1px solid var(--line);border-radius:12px;background:linear-gradient(180deg,var(--panel),#0c1426);
+  padding:15px 16px;margin:12px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.section-h{font-size:13px;letter-spacing:.6px;text-transform:uppercase;color:var(--accent2);margin:26px 0 8px;
+  border-left:3px solid var(--accent2);padding-left:9px}
+svg{width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:12px;background:#070b16}
+.node{cursor:pointer}
+.node .nbox{transition:filter .15s}
+.node:hover .nbox{filter:brightness(1.25)}
+.legend{display:flex;flex-wrap:wrap;gap:14px;color:var(--dim);font-size:12px;margin:6px 0 2px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.detail{min-height:60px}
+.kv{display:grid;grid-template-columns:160px 1fr;gap:4px 12px;font-size:13px}
+.kv .k{color:var(--dim)}
+.kv .v{color:var(--ink)}
+.pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11.5px;border:1px solid var(--line2);margin:2px 4px 2px 0}
+.ladder{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}
+.rung{border:1px solid var(--line);border-left-width:4px;border-radius:8px;padding:9px 11px;background:#0c1426}
+.rung b{font-size:13px}.rung .m{color:var(--dim);font-size:11.5px}
+.small{color:var(--dim);font-size:12px}
+.flexrow{display:flex;flex-wrap:wrap;gap:12px}
+.statline{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--dim)}
+.hl{color:var(--gold)}
+.foot{margin-top:30px;border-top:1px solid var(--line);padding-top:14px;color:var(--dim);font-size:12px}
+.maps a{display:inline-block;border:1px solid var(--line2);border-radius:8px;padding:7px 11px;margin:4px 6px 4px 0;color:var(--ink)}
+.maps a:hover{border-color:var(--accent);text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kick">HILBRA · The Asolaria Fabric Internet — Federation Topology</div>
+  <h1>Hilbra — Unified Fabric Map</h1>
+  <p class="sub">One expandable map of the whole federation: every colony's fabric, the crypto-keyed
+  cross-fabric search that links them, and the access tiers that keep each owner's PII private while a
+  public level-0 portal stays open. Click any colony to expand it. <span class="mono">Adding a colony as
+  the Matrix grows is a data edit — the renderer scales to N.</span></p>
+  <div class="bar" id="provbar"></div>
+
+  <div class="section-h">Federation Topology</div>
+  <div class="legend" id="legend"></div>
+  <div id="diagram"></div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="section-h" style="margin-top:2px">Selected node</div>
+      <div class="detail mono" id="detail">Click a colony or anchor above to inspect it.</div>
+    </div>
+    <div class="card">
+      <div class="section-h" style="margin-top:2px">Cross-Fabric Search · "Google for agents"</div>
+      <div id="link"></div>
+    </div>
+  </div>
+
+  <div class="section-h">Access-Tier Ladder <span class="small">(fabric 6-tier model · recall engine projects to levels 0/5/9)</span></div>
+  <div class="ladder" id="ladder"></div>
+
+  <div class="section-h">Other Maps in this Atlas</div>
+  <div class="maps" id="maps"></div>
+
+  <div class="section-h">Repositories <span class="small">(Hilbra · the public fabric internet — clone to join)</span></div>
+  <div class="maps" id="repos"></div>
+
+  <div class="foot" id="foot"></div>
+</div>
+
+<script id="fabric" type="application/json">
+{
+  "meta": {
+    "title": "Asolaria Unified Fabric Map",
+    "apex": "COL-ASOLARIA",
+    "operators": ["OP-JESSE-PID", "OP-RAYSSA-PID"],
+    "generated_grounding": "asolaria-fabric :4949 health + substrates + access-tier/matrix (live this session)",
+    "alphabet": "BEHCS-1024", "tuple_dim": 60
+  },
+  "provenance": [
+    {"label": "fabric topology", "prov": "measured", "note": "from live :4949 health + substrates"},
+    {"label": "acer 591,286 rows", "prov": "measured", "note": "indexed from unified-archaeology NDJSON"},
+    {"label": "6-tier access model", "prov": "canon", "note": "fabric /api/access-tier/matrix"},
+    {"label": "liris corpus count", "prov": "unverified", "note": "liris-reported; acer has not measured it"}
+  ],
+  "tiers": [
+    {"name": "PUBLIC",     "recall": 0, "color": "var(--t-public)",     "authority": "any_agent_read",            "redaction": "none",                      "note": "the public 'search engine for agents' tier"},
+    {"name": "RESTRICTED", "recall": 5, "color": "var(--t-restricted)", "authority": "operator_or_quintet_cosign","redaction": "hashes_and_summaries_only","note": "federation-internal (recall: federation)"},
+    {"name": "STEALTH",    "recall": 9, "color": "var(--t-stealth)",    "authority": "operator_witness_required", "redaction": "redacted_path_hash_only",  "note": "owner-private (recall: owner-private)"},
+    {"name": "HIDDEN",     "recall": 9, "color": "var(--t-hidden)",     "authority": "operator_witness_required", "redaction": "existence_and_policy_only","note": "owner-private"},
+    {"name": "SHADOW",     "recall": 9, "color": "var(--t-shadow)",     "authority": "operator_witness_required", "redaction": "existence_and_policy_only","note": "owner-private"},
+    {"name": "SECRET",     "recall": 9, "color": "var(--t-secret)",     "authority": "operator_witness_required", "redaction": "existence_and_policy_only","note": "owner-private"}
+  ],
+  "colonies": [
+    {
+      "id": "acer", "name": "ACER", "host": "DESKTOP-J99VCNH", "owner": "OP-JESSE-PID",
+      "role": "live-runtime · operator primary", "prov": "measured",
+      "recall": {"basename": "ASOLARIA-ACER-RECALL", "endpoint": "http://127.0.0.1:4791 (loopback) · :4791 LAN when joined", "rows": 591286, "status": "index built · loopback-tested · live LAN gated"},
+      "sources": [
+        {"name": "C", "rows": 446854}, {"name": "D", "rows": 123101},
+        {"name": "USB", "rows": 21037}, {"name": "GDRIVE", "rows": 253}, {"name": "WSL", "rows": 41}
+      ],
+      "exposes": ["PUBLIC (L0)"],
+      "stack": ["16 levels L0–L15", "17 language engines", "MCPs", "voxel atlas", "OCR overlays", "formula corpus", "Rust 8-byte host"]
+    },
+    {
+      "id": "liris", "name": "LIRIS", "host": "DESKTOP-PTSQTIE", "owner": "OP-RAYSSA-PID",
+      "role": "live-runtime · sister-organ (:4944 dashboard)", "prov": "measured",
+      "recall": {"basename": "ASOLARIA-LIRIS-RECALL", "endpoint": ":4791 (LAN, bind 0.0.0.0)", "rows": null, "rows_reported": "~10.6k", "status": "LIVE · level-filtered · /api/public/search open"},
+      "sources": [],
+      "exposes": ["PUBLIC (L0)"],
+      "stack": ["recall + atlas node engine", "HMAC + level-tag policy oracle (mirrors acer)"]
+    }
+  ],
+  "anchors": [
+    {"id": "usb", "name": "USB SOVLINUX 2TB", "kind": "sovereignty cold-storage", "role": "ACER-side · master backup · anchor #1", "prov": "measured", "owner": "physical · acer-side (OP-JESSE-PID) — liris has none", "owner_colony": "acer"},
+    {"id": "github", "name": "GitHub", "kind": "distributed durable", "role": "public-cosign anchor / mediator (shared)", "prov": "measured", "owner": "operator-auth-gated writes"}
+  ],
+  "links": [
+    {
+      "from": "acer", "to": "liris", "kind": "HMAC cross-fabric search", "prov": "measured",
+      "contract": "LINK|owner_pid|host|verb|nonce|ts_unix_s_be64",
+      "scheme": "HMAC-SHA256, key-off-wire (never transmitted)",
+      "consent": "owner-human-PID allowlist + per-owner level grant",
+      "levels": "public 0 (open) · federation 5 · owner-private 9 (owner-trusted links only)",
+      "shared_between_owners": "Jesse + Rayssa share all levels incl PII (consented); third parties get L0 only",
+      "transport_note": "trusted-LAN only until TLS/tunnel wraps it"
+    }
+  ],
+  "future": {"note": "new colonies attach here — add a colony object to this JSON and it renders automatically"},
+  "maps": [
+    {"title": "Recall + Atlas dashboard (ACER · layout absorbed from liris)", "href": "/acer-recall-atlas.html"},
+    {"title": "AgentTerms OS Dashboard (16×17 matrix)", "href": "/agentterms-os-dashboard.html"},
+    {"title": "Multi-Cylinder Fabric v2 (81,434 surfaces)", "href": "/asolaria-multi-cylinder-v2.html"},
+    {"title": "Scientific Voxel Atlas (726 PIDs)", "href": "/acer-scientific-voxel-atlas.html"},
+    {"title": "Real Model (967-pt prime cylinder)", "href": "/asolaria-real-model.html"},
+    {"title": "Map Index (landing)", "href": "/asolaria-map-index.html"}
+  ],
+  "repos": [
+    {"title": "Hilbra — the fabric internet (onboarding + protocol)", "href": "https://github.com/JesseBrown1980/Hilbra", "note": "founding PID 604f473ac0981dd7 — clone to join"},
+    {"title": "asolaria-federation-1024 — Rust Host-8 kernel", "href": "https://github.com/JesseBrown1980/asolaria-federation-1024", "note": "link_auth + level_tag policy core (Rust-canonical)"},
+    {"title": "Asolaria-ASI-On-Metal-Fabric-and-matrix — recall engine + maps", "href": "https://github.com/JesseBrown1980/Asolaria-ASI-On-Metal-Fabric-and-matrix", "note": "node recall engine (PR #3) · the maps · this map"},
+    {"title": "asolaria-behcs-256 — public BEHCS-256", "href": "https://github.com/JesseBrown1980/asolaria-behcs-256", "note": "discovered on LibHunt"}
+  ]
+}
+</script>
+
+<script>
+(function(){
+  const D = JSON.parse(document.getElementById('fabric').textContent);
+  const provClass = p => ({measured:'t-measured',canon:'t-canon',mixed:'t-mixed',unverified:'t-unv'}[p]||'t-unv');
+  const provLabel = p => ({measured:'MEASURED',canon:'CANON',mixed:'MIXED',unverified:'UNVERIFIED'}[p]||p.toUpperCase());
+  const esc = s => String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const fmt = n => (n==null?'—':Number(n).toLocaleString('en-US'));
+
+  // provenance bar
+  document.getElementById('provbar').innerHTML =
+    `<span class="tag t-measured">MEASURED</span><span class="tag t-canon">CANON</span><span class="tag t-unv">UNVERIFIED</span>`
+    + D.provenance.map(p=>`<span class="tag ${provClass(p.prov)}" title="${esc(p.note)}">${esc(p.label)}</span>`).join('');
+
+  // tier legend
+  document.getElementById('legend').innerHTML = D.tiers.map(t=>
+    `<span><span class="dot" style="background:${t.color}"></span>${esc(t.name)} <span class="small">→ L${t.recall}</span></span>`).join('');
+
+  // ---- SVG topology (data-driven, scales to N colonies) ----
+  const W=1240, colN=D.colonies.length, anchorN=D.anchors.length;
+  const apexY=64, opY=120, colY=250, anchorX=W-150;
+  const colSpan = Math.min(W-360, colN*300);
+  const colGap = colN>1 ? colSpan/(colN-1) : 0;
+  const colX = i => colN===1 ? W/2 : (W/2 - colSpan/2 + i*colGap);
+  const H = 500;
+  const tierColor = name => (D.tiers.find(t=>t.name===name)||{}).color || 'var(--accent)';
+
+  function box(x,y,w,h,fill,stroke){return `<rect class="nbox" x="${x-w/2}" y="${y}" width="${w}" height="${h}" rx="10" fill="${fill}" stroke="${stroke}" stroke-width="1.4"/>`;}
+  function txt(x,y,s,opt){opt=opt||{};return `<text x="${x}" y="${y}" text-anchor="${opt.anchor||'middle'}" fill="${opt.fill||'var(--ink)'}" font-size="${opt.size||13}" font-family="${opt.mono?'ui-monospace,Consolas,monospace':'inherit'}" ${opt.weight?`font-weight="${opt.weight}"`:''}>${esc(s)}</text>`;}
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Asolaria federation topology">`;
+  // edges: apex->ops, ops->colonies, colony<->colony link, colony->anchors
+  svg += `<g stroke="var(--line2)" stroke-width="1.4" fill="none">`;
+  svg += `<line x1="${W/2}" y1="${apexY+44}" x2="${W/2}" y2="${opY}"/>`;
+  D.colonies.forEach((c,i)=>{ svg+=`<line x1="${W/2}" y1="${opY+40}" x2="${colX(i)}" y2="${colY}"/>`; });
+  // cross-fabric link (draw between the colonies referenced by links[0] if present)
+  D.links.forEach(lk=>{
+    const a=D.colonies.findIndex(c=>c.id===lk.from), b=D.colonies.findIndex(c=>c.id===lk.to);
+    if(a>=0&&b>=0){ svg+=`<line x1="${colX(a)}" y1="${colY+62}" x2="${colX(b)}" y2="${colY+62}" stroke="var(--green)" stroke-dasharray="6 5" stroke-width="2"/>`;}
+  });
+  // (anchor edges are drawn owner-aware in the anchors section below)
+  svg += `</g>`;
+
+  // apex
+  svg += `<g>${box(W/2,apexY,260,44,'#101a33','var(--accent2)')}${txt(W/2,apexY+20,D.meta.apex,{weight:700,fill:'var(--canon-b)'})}${txt(W/2,apexY+37,'apex colony',{size:11,fill:'var(--dim)'})}</g>`;
+  // operator pair
+  svg += `<g>${box(W/2,opY,300,40,'#0e1726','var(--gold)')}${txt(W/2,opY+18,D.meta.operators.join('  +  '),{mono:true,size:12,fill:'var(--gold)'})}${txt(W/2,opY+33,'operator pair · owners',{size:10.5,fill:'var(--dim)'})}</g>`;
+
+  // colonies
+  D.colonies.forEach((c,i)=>{
+    const x=colX(i), expo=(c.exposes&&c.exposes[0])||'';
+    const stroke = tierColor((expo.split(' ')[0]||'PUBLIC'));
+    svg += `<g class="node" data-kind="colony" data-id="${c.id}">`;
+    svg += box(x,colY,240,84,'#0c1426',stroke);
+    svg += txt(x,colY+24,c.name,{weight:700,size:16,fill:stroke});
+    svg += txt(x,colY+42,c.host,{mono:true,size:11,fill:'var(--dim)'});
+    svg += txt(x,colY+60,(c.recall&&c.recall.rows!=null)?`${fmt(c.recall.rows)} rows`:(c.recall&&c.recall.rows_reported?`${c.recall.rows_reported} rows`:'recall node'),{size:12,fill:'var(--ink)'});
+    svg += txt(x,colY+76,'exposes '+expo,{size:10.5,fill:'var(--green)'});
+    svg += `</g>`;
+  });
+  // cross-link label
+  if(D.links[0]){ svg += txt(W/2,colY+58,'⇄ HMAC cross-fabric search',{size:11,fill:'var(--green)',mono:true}); }
+
+  // anchors — a row BELOW the colonies; each tied to its OWNER colony (solid gold edge,
+  // box under that colony) or shared (dashed, centered). This keeps acer-owned storage
+  // visually under ACER, never floating next to another colony.
+  const anchorY = colY + 150;
+  const sharedIdxs = D.anchors.map((an,i)=>an.owner_colony?-1:i).filter(i=>i>=0);
+  const anchorPos = D.anchors.map((an,i)=>{
+    const oi = an.owner_colony ? D.colonies.findIndex(c=>c.id===an.owner_colony) : -1;
+    if(oi>=0) return {an,oi,x:colX(oi)};
+    const k = sharedIdxs.indexOf(i), n=sharedIdxs.length;
+    return {an,oi,x: n<=1 ? W/2 : (W/2 - 120*(n-1)/2 + k*120)};
+  });
+  anchorPos.forEach(p=>{
+    const owned=p.oi>=0, srcX = owned?colX(p.oi):W/2;
+    svg += `<line x1="${srcX}" y1="${colY+84}" x2="${p.x}" y2="${anchorY}" fill="none" stroke="${owned?'var(--gold)':'var(--line2)'}" stroke-width="${owned?2:1.2}" ${owned?'':'stroke-dasharray="3 4"'}/>`;
+  });
+  anchorPos.forEach(p=>{
+    const an=p.an, owned=p.oi>=0;
+    svg += `<g class="node" data-kind="anchor" data-id="${an.id}">`;
+    svg += box(p.x,anchorY,214,owned?54:48,'#0d1320', owned?'var(--gold)':'var(--line2)');
+    svg += txt(p.x,anchorY+19,an.name,{size:12,weight:600,fill:owned?'var(--gold)':'var(--aqua)'});
+    svg += txt(p.x,anchorY+35,an.role,{size:9.5,fill:'var(--dim)'});
+    if(owned) svg += txt(p.x,anchorY+49,'owned by '+esc(D.colonies[p.oi].name)+' · not liris',{size:8.5,fill:'var(--gold)'});
+    svg += `</g>`;
+  });
+
+  // future-colony ghost slot
+  const gx = colN===1 ? W/2+200 : colX(colN-1)+ (colGap||300);
+  svg += `<g opacity="0.5">${`<rect x="${Math.min(gx,W-130)-90}" y="${colY}" width="180" height="84" rx="10" fill="none" stroke="var(--line2)" stroke-dasharray="5 5"/>`}${txt(Math.min(gx,W-130),colY+40,'+ new colony',{size:12,fill:'var(--dim)'})}${txt(Math.min(gx,W-130),colY+58,'(add to JSON)',{size:10.5,fill:'var(--dim)'})}</g>`;
+
+  svg += `</svg>`;
+  document.getElementById('diagram').innerHTML = svg;
+
+  // ---- detail panel ----
+  function showColony(c){
+    const src = c.sources&&c.sources.length
+      ? `<div class="kv"><div class="k">sources</div><div class="v">${c.sources.map(s=>`${s.name}:${fmt(s.rows)}`).join(' · ')}</div></div>` : '';
+    const rows = c.recall.rows!=null ? `${fmt(c.recall.rows)} <span class="tag t-measured">MEASURED</span>`
+      : `${esc(c.recall.rows_reported||'—')} <span class="tag t-unv">UNVERIFIED (liris-reported)</span>`;
+    document.getElementById('detail').innerHTML =
+      `<div class="kv">
+        <div class="k">colony</div><div class="v hl">${esc(c.name)} <span class="tag ${provClass(c.prov)}">${provLabel(c.prov)}</span></div>
+        <div class="k">host</div><div class="v">${esc(c.host)}</div>
+        <div class="k">owner PID</div><div class="v">${esc(c.owner)}</div>
+        <div class="k">role</div><div class="v">${esc(c.role)}</div>
+        <div class="k">recall basename</div><div class="v">${esc(c.recall.basename)}</div>
+        <div class="k">recall endpoint</div><div class="v">${esc(c.recall.endpoint)}</div>
+        <div class="k">recall rows</div><div class="v">${rows}</div>
+        ${src.replace(/^<div class="kv">|<\/div>$/g,'')}
+        <div class="k">status</div><div class="v">${esc(c.recall.status)}</div>
+        <div class="k">exposes</div><div class="v">${(c.exposes||[]).map(e=>`<span class="pill" style="border-color:${tierColor(e.split(' ')[0])};color:${tierColor(e.split(' ')[0])}">${esc(e)}</span>`).join('')}</div>
+        <div class="k">fabric stack</div><div class="v">${(c.stack||[]).map(s=>`<span class="pill">${esc(s)}</span>`).join('')}</div>
+      </div>`;
+  }
+  function showAnchor(a){
+    document.getElementById('detail').innerHTML =
+      `<div class="kv">
+        <div class="k">anchor</div><div class="v hl">${esc(a.name)} <span class="tag ${provClass(a.prov)}">${provLabel(a.prov)}</span></div>
+        <div class="k">kind</div><div class="v">${esc(a.kind)}</div>
+        <div class="k">role</div><div class="v">${esc(a.role)}</div>
+        <div class="k">owner</div><div class="v">${esc(a.owner)}</div>
+      </div>`;
+  }
+  document.querySelectorAll('.node').forEach(n=>{
+    n.addEventListener('click',()=>{
+      const id=n.getAttribute('data-id'), kind=n.getAttribute('data-kind');
+      if(kind==='colony') showColony(D.colonies.find(c=>c.id===id));
+      else showAnchor(D.anchors.find(a=>a.id===id));
+    });
+  });
+  // default select acer
+  if(D.colonies[0]) showColony(D.colonies[0]);
+
+  // ---- cross-link panel ----
+  const lk=D.links[0];
+  if(lk){
+    document.getElementById('link').innerHTML =
+      `<div class="kv">
+        <div class="k">link</div><div class="v hl">${esc(lk.from)} ⇄ ${esc(lk.to)} <span class="tag ${provClass(lk.prov)}">${provLabel(lk.prov)}</span></div>
+        <div class="k">contract</div><div class="v mono">${esc(lk.contract)}</div>
+        <div class="k">scheme</div><div class="v">${esc(lk.scheme)}</div>
+        <div class="k">consent</div><div class="v">${esc(lk.consent)}</div>
+        <div class="k">levels</div><div class="v">${esc(lk.levels)}</div>
+        <div class="k">owners</div><div class="v">${esc(lk.shared_between_owners)}</div>
+        <div class="k">transport</div><div class="v" style="color:var(--amber)">${esc(lk.transport_note)}</div>
+      </div>`;
+  }
+
+  // ---- ladder ----
+  document.getElementById('ladder').innerHTML = D.tiers.map(t=>
+    `<div class="rung" style="border-left-color:${t.color}">
+       <b style="color:${t.color}">${esc(t.name)}</b> <span class="m mono">→ recall L${t.recall}</span>
+       <div class="m">${esc(t.authority)}</div>
+       <div class="m">redaction: ${esc(t.redaction)}</div>
+       <div class="m">${esc(t.note)}</div>
+     </div>`).join('');
+
+  // ---- maps ----
+  document.getElementById('maps').innerHTML = D.maps.map(m=>`<a href="${esc(m.href)}">${esc(m.title)} ↗</a>`).join('');
+  // ---- repos ----
+  document.getElementById('repos').innerHTML = (D.repos||[]).map(r=>`<a href="${esc(r.href)}" target="_blank" rel="noopener" title="${esc(r.note||'')}">${esc(r.title)} ↗</a>`).join('');
+
+  // ---- footer ----
+  document.getElementById('foot').innerHTML =
+    `apex <b>${esc(D.meta.apex)}</b> · operators ${D.meta.operators.map(esc).join(' + ')} · alphabet ${esc(D.meta.alphabet)} · tuple_dim ${D.meta.tuple_dim}<br>
+     Grounding: ${esc(D.meta.generated_grounding)}.<br>
+     <b>Expandable by design:</b> ${esc(D.future.note)}. The public tier (level 0) is provably PII-free — PII paths/content always classify to owner-private and never reach L0.`;
+})();
+</script>
+</body>
+</html>
