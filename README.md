@@ -1,3 +1,5 @@
+> ⚠ **P4B frame:** the **metal/matrix rung** — the place/substrate that runs the **Host8 kernel** + **stubbed rooms**, animated by the **operator-gated crank (E≠0)**. Root = the 8-byte watcher-gated nested agent. See [`METAL-MATRIX-ROOT-FRAME.md`](./METAL-MATRIX-ROOT-FRAME.md) + the system `MAP.md`.
+
 # Asolaria — ASI On-Metal Fabric & Matrix (sister data-exchange repo)
 
 **Purpose.** This repo is the **bilateral data-exchange + comparison surface** between the two
