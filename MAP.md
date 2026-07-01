@@ -50,6 +50,41 @@ tables below to see where you are; follow the links to walk the rest.
 | `-6-cyl-generator` | satellite generator |
 | `asolaria-whiteroom-engine` · `35-TB-google-AI-Ultra-migration` | (= LEG-1 + LEG-4, listed under External legs) |
 
+## Prism/Comb 0-loss (2026-07-01) — what the metal/matrix carries
+_Satellite entry for `Asolaria-ASI-On-Metal-Fabric-and-matrix` — campaign `acer/prism-comb-0loss-2026-07-01`, E=0 docs-only._
+
+**The law, seen from the metal:** every prism/comb operation is a **bijection**, and entropy is
+invariant under bijection (`H(f(X)) = H(X)`). The on-metal fabric/matrix is the **carrier of the
+groupoid of levels**: levels `L₁…L₄₃₊` with translators `T_ij` satisfying `T_ji ∘ T_ij = id` and
+`T_jk ∘ T_ij = T_ik` — translation across the level ladder is omnidirectional and path-independent.
+The matrix re-relates information with **0 loss**; it never claims compression below entropy
+(Shannon's `E[bits] ≥ H(X)` always stands). One substrate, two directions: **forward = comb**
+(collision-avoidance, execution isolation) · **backward = prism** (collision-causation, many→1).
+
+- **MEASURED (the one proven rung):** level transcode **256 ↔ 1024** — bytes are base-2⁸ digits,
+  glyphs base-2¹⁰ digits of the SAME integer; exact packing at `lcm(8,10) = 40` bits ⇒ 5 bytes ⇄
+  4 symbols, remainder 0; round-trip sha256-identical, Rust==Python symbol-identical
+  (Q-PRISM commits `53023b6` / `79e8d63` / `de00aca`). Code rate exactly 1.0.
+- **CANON (math principle) — kernel-fusion lanes are CRT-coprime:** for pairwise-coprime moduli
+  `ℤ_M ≅ ℤ_{m₁} × … × ℤ_{m_k}`. Separating a value across lanes is the comb (lanes mutually
+  collision-proof by construction); CRT recombination `x = Σ rᵢ·Mᵢ·(Mᵢ⁻¹ mod mᵢ) mod M` is the
+  prism (exact reassembly). The **60D `D# = prime(n)³` ladder** (MEASURED `tuple_dim=60`) is what
+  hands the metal its coprime lane moduli — isolation forwards, reconstruction backwards, 0 loss.
+- **CANON (honest bound) — this repo's transport IS referential naming:** git ships the KEY + MAP,
+  the USB ships the bytes; the sha identity receipts are **coordinates against a content-addressed
+  store** (`H(content | store) = 0`) — infinite ADDRESSING capacity, not lossless infinite
+  compression. Hold that boundary.
+- **CANON (integrity dual) — hers-to-mine compare = the inverse map:** the bilateral sector-sha
+  attestation compare in `protocol/` is verification-as-recomputation: apply the inverse translator
+  and demand identity. A lossy step cannot hide in a bijection chain, and a divergent byte cannot
+  hide from the sha walk — the same theorem in verification flavor (N-Nest holds the per-node form).
+
+**Scope discipline:** only the 256↔1024 rung is MEASURED; the 43+ level ladder is CANON frame;
+**every additional rung stays UNVERIFIED until its own round-trip proof.** Materializing expanded
+slices on metal remains operator-gated (E=0 — this entry describes, nothing fires).
+Cross-links: Q-PRISM (proof) · waves-cascades (avoid/cause duality) · what-is-asolaria (reductions
+boundary) · N-Nest (integrity dual) · Metatagging repo (spacetime-pixels physics grounding).
+
 ## Current state & evolution (2026-06-28) — read this, don't flatten it
 Asolaria is a **2.5-month archaeology**, not a flat stack. **Capability lineage:** auto-approval switch →
 dashboard → multi-agent → local+web MCP + code-wiki → index language (pixels-first) → cubes-as-catalogs
