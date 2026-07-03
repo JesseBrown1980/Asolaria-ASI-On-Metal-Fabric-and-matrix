@@ -1,0 +1,11 @@
+F5HBIRECV|repo=Asolaria-ASI-On-Metal-Fabric-and-matrix|seat=LIRIS-CODEX|date=2026-07-03|artifact=FABLE5-HBI-PROJECTED-DASHBOARD-FULL-SYNTHESIS-2026-07-03.hbi|artifact_rows_claimed=43|artifact_lines_measured=61|artifact_bytes=6542|artifact_sha256_prefix=90d65225|source_class=MEASURED_LIRIS_GITHUB|json=0
+F5HBIEVIDENCE|class=MEASURED_LIRIS|surface=fabric_health|service=super-asolaria-os-dashboard-liris-mirror|port=4944|apex=COL-ASOLARIA|operator_pair=OP-JESSE-PID+OP-RAYSSA-PID|ts=2026-07-03T13:43:07Z|json=0
+F5HBIEVIDENCE|class=MEASURED_LIRIS|surface=fabric_everything|bus=http://192.168.100.1:4947|dashboards=acer_4949+liris_4944|memory_canon=/api/canon-index|sovereignty_usb=/api/sovereignty-usb|json=0
+F5HBIEVIDENCE|class=MEASURED_LIRIS|surface=ubuntu_pipe|host8_serve=0.0.0.0:5088|process=host8-serve|role=linux_lane_supporting_sensor|json=0
+F5HBIEVIDENCE|class=MEASURED_LIRIS|surface=/hbp/supervisors|rows=43|claimed_total=713|omni_roles=SUP-OMNISPINDLE+SUP-OMNIMETS+SUP-OMNIFLYWHEEL|substrates=SOVLINUX_2TB+Liris+GitHub+Acer_descriptors|json=0
+F5HBIEVIDENCE|class=MEASURED_GITHUB|surface=asolaria-federation-1024#13|detail=DeepSeek_DSpark_confidence_scheduled_verify_staged_no_fire|json=0
+F5HBIEVIDENCE|class=MEASURED_LIRIS_GITHUB|surface=asolaria-federation-1024@acer/hbi-synthesis-os-upgrades-2026-07-03|commit=f118a022c67e00d6dd10dfd917b1a5ae65a22f90|path=docs/receipts/FABLE5-HBI-PROJECTED-DASHBOARD-FULL-SYNTHESIS-2026-07-03.hbi|bytes=6542|sha256=90d6522592fbde389837e8ae1ebbb13df699304ef32f85c75e5fb3763c4fcacd|git_blob_sha=da5fa46151e9c170f2c5b600f1f639f5f81c8127|sidecar=match|json=0
+F5HBIASSERT|class=OPERATOR_OBSERVED_ACER|detail=OS_on_metal_upgrade_frame_tracks_P0_boot_P1_crypto_hookwall_spawn_gate_P2_server_ring_P4_fleet_RoomRotor_stubbed_8byte_hosts|json=0
+F5HBIBOUNDARY|class=ACER_SUBSTRATE_NOT_REMEASURED_FROM_LIRIS|why=HBI_artifact_is_measured_on_GitHub_branch; Acer_side_asolaria_os_efi_boot_deploy_still_requires_Acer_or_raw_substrate_remeasurement|json=0
+F5HBIBOUNDARY|class=MEASURED_LIRIS_FALLBACK|surface=bus_health|status=stale_fallback_all_bases_unavailable|json=0
+F5HBIACTION|decision=receiver_receipt_only|scope=on_metal_map_roll_forward_without_daemon_start_or_disk_write|fire=0|process_launch=0|raw_disk_write=0|json=0
