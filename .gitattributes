@@ -9,3 +9,7 @@
 reports/*.html      linguist-generated=true
 tools/atlas/*.mjs   linguist-vendored=true
 tools/falcon/**     linguist-vendored=true
+.gitattributes text eol=lf
+docs/session-2026-07-03-fable5/*.hbp text eol=lf
+docs/session-2026-07-03-fable5/*.md text eol=lf
+docs/session-2026-07-03-fable5/*.sha256 text eol=lf
