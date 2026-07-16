@@ -1,0 +1,5 @@
+VIDEOFLASHSTATUSv1|date=2026-07-16|video_id=jmKlNBD4HGo|title=Best UFO Ever Recorded!|publisher=N.E.X.U.S|identity=RESOLVED|public_media=HELD_PUBLIC_MEDIA_UNAVAILABLE|camera_raw=NOT_OBTAINABLE_FROM_YOUTUBE_LINK|json=0
+ACQUISITION|yt_dlp_clients=8|yt_dlp_success=0|invidious_status=403|piped_status=500|embed_surfaces=3|videoplayback_requests=0|authenticated=0|drm_bypass=0|json=0
+SELFTEST|frames=80|samples=17|model_families=8|floors=64,256,1024,4096|opportunities_per_transition=800|total_opportunities=2400|accepted=192,768,800|held=608,32,0|restore=1|omega=c4337f05dfd03b2f61cc7f74bd3e6ea638b0b933e20c1a2efafe198247c68f9e|json=0
+OPERATORINTAKE|workflow=video-flashlight-operator-media.yml|cube_count_default=27|passes_default=800|source_tier=OPERATOR_SUPPLIED_MEDIA|url_retained=0|expected_sha_gate=1|camera_raw_independently_verified=0|json=0
+BOUNDARY|object_identification=HELD|tetrahedron=HELD|torus=HELD|alien=HELD|physical_quantum=HELD|spacetime_grid=HELD|status=PASS|json=0
