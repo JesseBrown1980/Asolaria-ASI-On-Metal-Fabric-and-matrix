@@ -74,12 +74,13 @@ jobs:
         env:
           PYTHONPATH: tools/video-flashlight
         run: |
+          set -euo pipefail
           python tools/video-flashlight/analyze_video_cube.py \
             --video work/selftest/synthetic.avi \
             --source-receipt work/selftest/receipt/SOURCE-RECEIPT.json \
             --cube-id TEST --start-s 0 --end-s 4 \
             --max-samples 16 --passes 800 \
-            --output work/selftest/cube | tee work/selftest/run.log
+            --output work/selftest/cube 2>&1 | tee work/selftest/run.log
           (cd work/selftest/cube && sha256sum -c SHA256SUMS)
           grep -q 'restore=1' work/selftest/run.log
           python - <<'PY'
@@ -207,9 +208,10 @@ jobs:
         continue-on-error: true
         run: |
           set -euo pipefail
-          python tools/video-flashlight/capture_public_embed.py \
+          PYTHONPATH=tools/video-flashlight \
+          python tools/video-flashlight/capture_public_embed_v2.py \
             --video-id "$VIDEO_ID" --output-dir work/video-source \
-            --max-duration 3600 | tee work/video-source/diagnostics/public-embed.log
+            --max-duration 3600 2>&1 | tee work/video-source/diagnostics/public-embed.log
           test -f work/video-source/video.mkv
           test -f work/video-source/video.metadata.json
           test -f work/video-source/PUBLIC-EMBED-RECEIPT.json
