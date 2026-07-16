@@ -46,19 +46,24 @@ jobs:
       - name: Resolve public metadata across supported player clients
         id: metadata
         continue-on-error: true
+        shell: bash
         run: |
+          # GitHub's bash wrapper starts with -e. Disable it while trying fallbacks;
+          # the explicit gate at the end controls the step result.
+          set +e
           set -uo pipefail
           rm -rf work/video-source
           mkdir -p work/video-source/diagnostics
 
-          # The public YouTube extractor surface changes over time. Try the standard
-          # client first, then several public player-client combinations. No cookies,
-          # login, DRM bypass, or private endpoint is used.
           clients=(
             ''
             'youtube:player_client=web_safari,android_vr,web_embedded'
             'youtube:player_client=tv,web_safari'
             'youtube:player_client=android_vr'
+            'youtube:player_client=web_embedded'
+            'youtube:player_client=mweb'
+            'youtube:player_client=ios,android'
+            'youtube:player_client=tv_embedded,web_creator'
           )
 
           success=0
@@ -68,8 +73,8 @@ jobs:
             if [ -n "${clients[$index]}" ]; then
               args+=(--extractor-args "${clients[$index]}")
             fi
-            echo "METADATA_ATTEMPT=$index CLIENTS=${clients[$index]:-default}" \
-              | tee "work/video-source/diagnostics/metadata-attempt-${index}.log"
+            log="work/video-source/diagnostics/metadata-attempt-${index}.log"
+            echo "METADATA_ATTEMPT=$index CLIENTS=${clients[$index]:-default}" | tee "$log"
             yt-dlp \
               --verbose \
               --no-playlist \
@@ -79,8 +84,9 @@ jobs:
               --dump-single-json \
               "$VIDEO_URL" \
               > work/video-source/video.metadata.candidate.json \
-              2>> "work/video-source/diagnostics/metadata-attempt-${index}.log"
+              2>> "$log"
             rc=$?
+            echo "RETURN_CODE=$rc" >> "$log"
             if [ "$rc" -eq 0 ] && jq -e '.id == env.VIDEO_ID' \
               work/video-source/video.metadata.candidate.json >/dev/null 2>&1; then
               mv work/video-source/video.metadata.candidate.json \
@@ -96,13 +102,15 @@ jobs:
           curl -fsSL \
             "https://www.youtube.com/oembed?url=${VIDEO_URL}&format=json" \
             -o work/video-source/diagnostics/oembed.json \
-            2> work/video-source/diagnostics/oembed.log || true
+            2> work/video-source/diagnostics/oembed.log
+          echo "OEMBED_RETURN_CODE=$?" >> work/video-source/diagnostics/oembed.log
 
           if [ "$success" -ne 1 ]; then
             echo 'METADATA_RESOLUTION=HELD_PUBLIC_STREAM_UNAVAILABLE'
-            echo '--- yt-dlp diagnostics ---'
-            cat work/video-source/diagnostics/metadata-attempt-*.log || true
-            echo '--- oEmbed diagnostics ---'
+            echo '--- yt-dlp summaries ---'
+            grep -hE 'METADATA_ATTEMPT|RETURN_CODE|playability status|ERROR:|Sign in|not available|Private video|Video unavailable' \
+              work/video-source/diagnostics/metadata-attempt-*.log || true
+            echo '--- oEmbed ---'
             cat work/video-source/diagnostics/oembed.log || true
             cat work/video-source/diagnostics/oembed.json || true
             exit 1
@@ -112,12 +120,15 @@ jobs:
             work/video-source/video.metadata.json \
             > work/video-source/video.metadata.normalized.json
           echo "METADATA_RESOLUTION=PASS SELECTED=${selected:-default}"
+          exit 0
 
       - name: Download best publicly served stream without a second video encode
         id: download
         if: steps.metadata.outcome == 'success'
         continue-on-error: true
+        shell: bash
         run: |
+          set +e
           set -uo pipefail
           extractor_args="$(cat work/video-source/SELECTED-EXTRACTOR-ARGS.txt)"
           args=()
@@ -152,6 +163,7 @@ jobs:
             | sort)
           test "${#videos[@]}" -eq 1
           printf '%s\n' "${videos[0]}" > work/video-source/VIDEO-PATH.txt
+          exit 0
 
       - name: Probe and seal source identity
         id: seal
