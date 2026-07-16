@@ -1,0 +1,139 @@
+name: Video flashlight jmKlNBD4HGo — source ingest
+
+on:
+  pull_request:
+    paths:
+      - 'artifacts/video-jmKlNBD4HGo/**'
+      - 'tools/video-flashlight/**'
+      - '.github/workflows/video-flashlight-jmKlNBD4HGo.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  VIDEO_ID: jmKlNBD4HGo
+  VIDEO_URL: https://www.youtube.com/watch?v=jmKlNBD4HGo
+
+jobs:
+  source:
+    name: Fetch and seal the highest-quality public YouTube stream
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      matrix: ${{ steps.seal.outputs.matrix }}
+      video_sha256: ${{ steps.seal.outputs.video_sha256 }}
+      duration_s: ${{ steps.seal.outputs.duration_s }}
+      source_filename: ${{ steps.seal.outputs.source_filename }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install public-stream and media tools
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install 'yt-dlp[default]'
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg jq
+          yt-dlp --version
+          ffmpeg -version | head -n 1
+
+      - name: Resolve public metadata
+        run: |
+          set -euo pipefail
+          rm -rf work/video-source
+          mkdir -p work/video-source
+          yt-dlp \
+            --no-playlist \
+            --remote-components ejs:github \
+            --dump-single-json \
+            "$VIDEO_URL" > work/video-source/video.metadata.json
+          jq '{id,title,uploader,channel,channel_id,upload_date,timestamp,duration,width,height,fps,availability,format_id,format,webpage_url,description,formats}' \
+            work/video-source/video.metadata.json > work/video-source/video.metadata.normalized.json
+
+      - name: Download best publicly served stream without a second video encode
+        run: |
+          set -euo pipefail
+          yt-dlp \
+            --no-playlist \
+            --remote-components ejs:github \
+            --format 'bv*+ba/b' \
+            --merge-output-format mkv \
+            --write-info-json \
+            --write-description \
+            --write-thumbnail \
+            --write-subs \
+            --write-auto-subs \
+            --sub-langs 'all,-live_chat' \
+            --output 'work/video-source/video.%(ext)s' \
+            "$VIDEO_URL"
+
+          mapfile -t videos < <(find work/video-source -maxdepth 1 -type f \
+            \( -name 'video.mkv' -o -name 'video.mp4' -o -name 'video.webm' -o -name 'video.mov' \) \
+            | sort)
+          test "${#videos[@]}" -eq 1
+          printf '%s\n' "${videos[0]}" > work/video-source/VIDEO-PATH.txt
+
+      - name: Probe and seal source identity
+        id: seal
+        run: |
+          set -euo pipefail
+          video="$(cat work/video-source/VIDEO-PATH.txt)"
+          ffprobe -v error -show_format -show_streams -print_format json "$video" \
+            > work/video-source/video.ffprobe.json
+          python tools/video-flashlight/prepare_source.py \
+            --video "$video" \
+            --metadata work/video-source/video.metadata.json \
+            --ffprobe work/video-source/video.ffprobe.json \
+            --video-id "$VIDEO_ID" \
+            --cube-count 27 \
+            --output work/video-source/receipt | tee work/video-source/ingest.log
+          (cd work/video-source/receipt && sha256sum -c SHA256SUMS)
+          grep -q 'tier=YOUTUBE_BEST_PUBLIC_STREAM' work/video-source/ingest.log
+          grep -q 'camera_raw=0' work/video-source/ingest.log
+          grep -q 'coverage=FULL_TIMELINE' work/video-source/ingest.log
+
+      - name: Upload the exact public-stream source package
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-source-jmKlNBD4HGo
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0
+          path: |
+            work/video-source/video.mkv
+            work/video-source/video.mp4
+            work/video-source/video.webm
+            work/video-source/video.mov
+            work/video-source/video.metadata.json
+            work/video-source/video.metadata.normalized.json
+            work/video-source/video.info.json
+            work/video-source/video.description
+            work/video-source/video.*.vtt
+            work/video-source/video.*.srt
+            work/video-source/video.jpg
+            work/video-source/video.webp
+            work/video-source/video.png
+            work/video-source/video.ffprobe.json
+            work/video-source/VIDEO-PATH.txt
+            work/video-source/ingest.log
+            work/video-source/receipt/**
+
+      - name: Job summary
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          # Video source sealed
+
+          - Video ID: \`${VIDEO_ID}\`
+          - Source tier: \`YOUTUBE_BEST_PUBLIC_STREAM\`
+          - Original camera raw: \`false\`
+          - SHA-256: \`${{ steps.seal.outputs.video_sha256 }}\`
+          - Duration: \`${{ steps.seal.outputs.duration_s }} s\`
+          - Temporal cubes: \`27\`
+
+          The downloaded bytes are the highest-quality public stream returned to yt-dlp, not asserted to be the original camera memory-card file.
+          EOF
