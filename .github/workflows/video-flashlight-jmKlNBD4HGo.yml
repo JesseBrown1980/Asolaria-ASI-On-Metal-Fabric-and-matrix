@@ -17,14 +17,15 @@ env:
 
 jobs:
   source:
-    name: Fetch and seal the highest-quality public YouTube stream
+    name: Fetch and seal the best public video stream
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     outputs:
       matrix: ${{ steps.seal.outputs.matrix }}
       video_sha256: ${{ steps.seal.outputs.video_sha256 }}
       duration_s: ${{ steps.seal.outputs.duration_s }}
       source_filename: ${{ steps.seal.outputs.source_filename }}
+      source_tier: ${{ steps.seal.outputs.source_tier }}
     steps:
       - uses: actions/checkout@v4
 
@@ -36,20 +37,18 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
-          python -m pip install 'yt-dlp[default]'
+          python -m pip install 'yt-dlp[default]' requests
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg jq
           yt-dlp --version
           node --version
           ffmpeg -version | head -n 1
 
-      - name: Resolve public metadata across supported player clients
-        id: metadata
+      - name: Try direct public YouTube clients
+        id: direct
         continue-on-error: true
         shell: bash
         run: |
-          # GitHub's bash wrapper starts with -e. Disable it while trying fallbacks;
-          # the explicit gate at the end controls the step result.
           set +e
           set -uo pipefail
           rm -rf work/video-source
@@ -66,35 +65,27 @@ jobs:
             'youtube:player_client=tv_embedded,web_creator'
           )
 
-          success=0
           selected=''
           for index in "${!clients[@]}"; do
             args=()
             if [ -n "${clients[$index]}" ]; then
               args+=(--extractor-args "${clients[$index]}")
             fi
-            log="work/video-source/diagnostics/metadata-attempt-${index}.log"
-            echo "METADATA_ATTEMPT=$index CLIENTS=${clients[$index]:-default}" | tee "$log"
+            log="work/video-source/diagnostics/direct-${index}.log"
+            echo "DIRECT_ATTEMPT=$index CLIENTS=${clients[$index]:-default}" | tee "$log"
             yt-dlp \
-              --verbose \
-              --no-playlist \
-              --js-runtimes node \
-              --remote-components ejs:github \
-              "${args[@]}" \
-              --dump-single-json \
-              "$VIDEO_URL" \
-              > work/video-source/video.metadata.candidate.json \
-              2>> "$log"
-            rc=$?
+              --verbose --no-playlist --js-runtimes node \
+              --remote-components ejs:github "${args[@]}" \
+              --format 'bv*+ba/b' --merge-output-format mkv \
+              --write-info-json --write-description --write-thumbnail \
+              --write-subs --write-auto-subs --sub-langs 'all,-live_chat' \
+              --output 'work/video-source/video.%(ext)s' \
+              "$VIDEO_URL" 2>&1 | tee -a "$log"
+            rc=${PIPESTATUS[0]}
             echo "RETURN_CODE=$rc" >> "$log"
-            if [ "$rc" -eq 0 ] && jq -e '.id == env.VIDEO_ID' \
-              work/video-source/video.metadata.candidate.json >/dev/null 2>&1; then
-              mv work/video-source/video.metadata.candidate.json \
-                work/video-source/video.metadata.json
-              printf '%s' "${clients[$index]}" \
-                > work/video-source/SELECTED-EXTRACTOR-ARGS.txt
+            if [ "$rc" -eq 0 ]; then
               selected="${clients[$index]}"
-              success=1
+              printf '%s' "$selected" > work/video-source/SELECTED-EXTRACTOR-ARGS.txt
               break
             fi
           done
@@ -105,83 +96,59 @@ jobs:
             2> work/video-source/diagnostics/oembed.log
           echo "OEMBED_RETURN_CODE=$?" >> work/video-source/diagnostics/oembed.log
 
-          if [ "$success" -ne 1 ]; then
-            echo 'METADATA_RESOLUTION=HELD_PUBLIC_STREAM_UNAVAILABLE'
-            echo '--- yt-dlp summaries ---'
-            grep -hE 'METADATA_ATTEMPT|RETURN_CODE|playability status|ERROR:|Sign in|not available|Private video|Video unavailable' \
-              work/video-source/diagnostics/metadata-attempt-*.log || true
-            echo '--- oEmbed ---'
-            cat work/video-source/diagnostics/oembed.log || true
-            cat work/video-source/diagnostics/oembed.json || true
-            exit 1
-          fi
-
-          jq '{id,title,uploader,channel,channel_id,upload_date,timestamp,duration,width,height,fps,availability,format_id,format,webpage_url,description,formats}' \
-            work/video-source/video.metadata.json \
-            > work/video-source/video.metadata.normalized.json
-          echo "METADATA_RESOLUTION=PASS SELECTED=${selected:-default}"
-          exit 0
-
-      - name: Download best publicly served stream without a second video encode
-        id: download
-        if: steps.metadata.outcome == 'success'
-        continue-on-error: true
-        shell: bash
-        run: |
-          set +e
-          set -uo pipefail
-          extractor_args="$(cat work/video-source/SELECTED-EXTRACTOR-ARGS.txt)"
-          args=()
-          if [ -n "$extractor_args" ]; then
-            args+=(--extractor-args "$extractor_args")
-          fi
-
-          yt-dlp \
-            --verbose \
-            --no-playlist \
-            --js-runtimes node \
-            --remote-components ejs:github \
-            "${args[@]}" \
-            --format 'bv*+ba/b' \
-            --merge-output-format mkv \
-            --write-info-json \
-            --write-description \
-            --write-thumbnail \
-            --write-subs \
-            --write-auto-subs \
-            --sub-langs 'all,-live_chat' \
-            --output 'work/video-source/video.%(ext)s' \
-            "$VIDEO_URL" \
-            2>&1 | tee work/video-source/diagnostics/download.log
-          rc=${PIPESTATUS[0]}
-          if [ "$rc" -ne 0 ]; then
-            exit "$rc"
-          fi
-
           mapfile -t videos < <(find work/video-source -maxdepth 1 -type f \
             \( -name 'video.mkv' -o -name 'video.mp4' -o -name 'video.webm' -o -name 'video.mov' \) \
             | sort)
-          test "${#videos[@]}" -eq 1
-          printf '%s\n' "${videos[0]}" > work/video-source/VIDEO-PATH.txt
-          exit 0
+          if [ "${#videos[@]}" -eq 1 ]; then
+            printf '%s\n' "${videos[0]}" > work/video-source/VIDEO-PATH.txt
+            # yt-dlp names the sidecar after the selected extension.
+            info="$(find work/video-source -maxdepth 1 -type f -name 'video.info.json' | head -n 1)"
+            test -n "$info"
+            cp "$info" work/video-source/video.metadata.json
+            printf 'YOUTUBE_BEST_PUBLIC_STREAM' > work/video-source/SOURCE-TIER.txt
+            echo "DIRECT_PUBLIC_STREAM=PASS CLIENTS=${selected:-default}"
+            exit 0
+          fi
+          echo 'DIRECT_PUBLIC_STREAM=HELD_BOT_GATE'
+          exit 1
+
+      - name: Try public Invidious and Piped relays
+        id: relay
+        if: steps.direct.outcome != 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          python tools/video-flashlight/fetch_public_mirror.py \
+            --video-id "$VIDEO_ID" \
+            --output-dir work/video-source | tee work/video-source/diagnostics/public-relay.log
+          test -f work/video-source/video.mkv
+          test -f work/video-source/video.metadata.json
+          printf '%s\n' work/video-source/video.mkv > work/video-source/VIDEO-PATH.txt
+          printf 'PUBLIC_THIRD_PARTY_RELAY_OF_YOUTUBE' > work/video-source/SOURCE-TIER.txt
 
       - name: Probe and seal source identity
         id: seal
-        if: steps.metadata.outcome == 'success' && steps.download.outcome == 'success'
+        if: steps.direct.outcome == 'success' || steps.relay.outcome == 'success'
         run: |
           set -euo pipefail
           video="$(cat work/video-source/VIDEO-PATH.txt)"
+          tier="$(cat work/video-source/SOURCE-TIER.txt)"
           ffprobe -v error -show_format -show_streams -print_format json "$video" \
             > work/video-source/video.ffprobe.json
+          relay_args=()
+          if [ -f work/video-source/PUBLIC-RELAY-RECEIPT.json ]; then
+            relay_args+=(--relay-receipt work/video-source/PUBLIC-RELAY-RECEIPT.json)
+          fi
           python tools/video-flashlight/prepare_source.py \
             --video "$video" \
             --metadata work/video-source/video.metadata.json \
             --ffprobe work/video-source/video.ffprobe.json \
             --video-id "$VIDEO_ID" \
             --cube-count 27 \
+            --source-tier "$tier" \
+            "${relay_args[@]}" \
             --output work/video-source/receipt | tee work/video-source/ingest.log
           (cd work/video-source/receipt && sha256sum -c SHA256SUMS)
-          grep -q 'tier=YOUTUBE_BEST_PUBLIC_STREAM' work/video-source/ingest.log
           grep -q 'camera_raw=0' work/video-source/ingest.log
           grep -q 'coverage=FULL_TIMELINE' work/video-source/ingest.log
 
@@ -199,7 +166,6 @@ jobs:
             work/video-source/video.webm
             work/video-source/video.mov
             work/video-source/video.metadata.json
-            work/video-source/video.metadata.normalized.json
             work/video-source/video.info.json
             work/video-source/video.description
             work/video-source/video.*.vtt
@@ -209,7 +175,9 @@ jobs:
             work/video-source/video.png
             work/video-source/video.ffprobe.json
             work/video-source/VIDEO-PATH.txt
+            work/video-source/SOURCE-TIER.txt
             work/video-source/SELECTED-EXTRACTOR-ARGS.txt
+            work/video-source/PUBLIC-RELAY-RECEIPT.json
             work/video-source/diagnostics/**
             work/video-source/ingest.log
             work/video-source/receipt/**
@@ -218,10 +186,9 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
-          test '${{ steps.metadata.outcome }}' = 'success'
-          test '${{ steps.download.outcome }}' = 'success'
           test -f work/video-source/receipt/SOURCE-RECEIPT.json
           test -f work/video-source/VIDEO-PATH.txt
+          test -f work/video-source/SOURCE-TIER.txt
 
       - name: Job summary
         if: success()
@@ -230,11 +197,11 @@ jobs:
           # Video source sealed
 
           - Video ID: \`${VIDEO_ID}\`
-          - Source tier: \`YOUTUBE_BEST_PUBLIC_STREAM\`
+          - Source tier: \`${{ steps.seal.outputs.source_tier }}\`
           - Original camera raw: \`false\`
           - SHA-256: \`${{ steps.seal.outputs.video_sha256 }}\`
           - Duration: \`${{ steps.seal.outputs.duration_s }} s\`
           - Temporal cubes: \`27\`
 
-          The downloaded bytes are the highest-quality public stream returned to yt-dlp, not asserted to be the original camera memory-card file.
+          The bytes are a best available public video stream. They are not asserted to be the original camera memory-card file.
           EOF
