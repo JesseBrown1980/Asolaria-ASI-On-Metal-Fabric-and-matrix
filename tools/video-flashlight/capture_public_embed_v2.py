@@ -1,26 +1,12 @@
 #!/usr/bin/env python3
 """Compatibility entrypoint for the current public guest-media acquisition seat.
 
-The workflow historically supplied ``--max-duration`` to the player-capture seat.
-The v3 network-request harvester does not need that limit, but accepting and removing
-the legacy pair keeps the workflow contract stable while it tests signed public media
-requests from the same unauthenticated runner.
+The v4 seat waits for and stimulates the public player, records signed media requests,
+and fetches those public bytes through the same unauthenticated browser context before
+closing it. The workflow's historical CLI remains accepted by v4 directly.
 """
-from __future__ import annotations
-
-import sys
-
-from capture_public_embed_v3 import main
-
-
-def drop_legacy_option(name: str) -> None:
-    while name in sys.argv:
-        index = sys.argv.index(name)
-        del sys.argv[index]
-        if index < len(sys.argv):
-            del sys.argv[index]
+from capture_public_embed_v4 import main
 
 
 if __name__ == "__main__":
-    drop_legacy_option("--max-duration")
     main()
