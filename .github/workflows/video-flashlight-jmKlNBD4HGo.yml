@@ -1,4 +1,4 @@
-name: Video flashlight jmKlNBD4HGo — source ingest
+name: Video flashlight jmKlNBD4HGo — 27 cubes × 3 floors × 800
 
 on:
   pull_request:
@@ -16,6 +16,84 @@ env:
   VIDEO_URL: https://www.youtube.com/watch?v=jmKlNBD4HGo
 
 jobs:
+  selftest:
+    name: Synthetic inverse-geometry and hypercube selftest
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install analysis dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'numpy==2.4.4' opencv-python-headless zstandard tokenizers
+      - name: Compile analyzers
+        run: |
+          python -m py_compile tools/video-flashlight/*.py
+      - name: Create a rotating synthetic tetrahedron with nested conics
+        run: |
+          mkdir -p work/selftest
+          python - <<'PY'
+          import cv2, json, math, numpy as np
+          from pathlib import Path
+          path=Path('work/selftest/synthetic.avi')
+          writer=cv2.VideoWriter(str(path),cv2.VideoWriter_fourcc(*'MJPG'),20,(640,360))
+          base=np.array([[0,-120],[-140,100],[140,100],[0,25]],dtype=float)
+          for frame_no in range(80):
+              image=np.zeros((360,640,3),np.uint8)
+              angle=2*math.pi*frame_no/80
+              c,s=math.cos(angle),math.sin(angle)
+              matrix=np.array([[c,-0.35*s],[0.35*s,c]])
+              points=(base@matrix.T+np.array([320,180])).astype(np.int32)
+              for i,j in [(0,1),(0,2),(0,3),(1,2),(1,3),(2,3)]:
+                  cv2.line(image,tuple(points[i]),tuple(points[j]),(220,220,220),2)
+              cv2.ellipse(image,(320,180),(90,max(10,int(65*abs(math.cos(angle))))),0,0,360,(255,255,255),2)
+              cv2.ellipse(image,(320,180),(45,max(6,int(32*abs(math.cos(angle))))),0,0,360,(180,180,255),2)
+              for point in points: cv2.circle(image,tuple(point),4,(255,255,255),-1)
+              writer.write(image)
+          writer.release()
+          PY
+          ffprobe -v error -show_format -show_streams -print_format json work/selftest/synthetic.avi > work/selftest/ffprobe.json
+          python - <<'PY'
+          import json
+          json.dump({'id':'synthetic','title':'synthetic geometry','duration':4.0,'webpage_url':'local:selftest'},open('work/selftest/meta.json','w'))
+          PY
+          python tools/video-flashlight/prepare_source.py \
+            --video work/selftest/synthetic.avi \
+            --metadata work/selftest/meta.json \
+            --ffprobe work/selftest/ffprobe.json \
+            --video-id synthetic --cube-count 1 \
+            --output work/selftest/receipt
+      - name: Run one complete 64→256→1024→4096 cube
+        env:
+          PYTHONPATH: tools/video-flashlight
+        run: |
+          python tools/video-flashlight/analyze_video_cube.py \
+            --video work/selftest/synthetic.avi \
+            --source-receipt work/selftest/receipt/SOURCE-RECEIPT.json \
+            --cube-id TEST --start-s 0 --end-s 4 \
+            --max-samples 16 --passes 800 \
+            --output work/selftest/cube | tee work/selftest/run.log
+          (cd work/selftest/cube && sha256sum -c SHA256SUMS)
+          grep -q 'restore=1' work/selftest/run.log
+          python - <<'PY'
+          import json
+          r=json.load(open('work/selftest/cube/CUBE-RESULT.json'))
+          assert r['frames_decoded'] == 80
+          assert r['hypercube']['restore'] is True
+          assert r['hypercube']['floors'] == [64,256,1024,4096]
+          assert r['hypercube']['total_refinement_opportunities'] == 2400
+          assert len(r['models']) == 8
+          print('VIDEO_FLASHLIGHT_SELFTEST=PASS')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: video-flashlight-synthetic-selftest
+          retention-days: 30
+          path: work/selftest/**
+
   source:
     name: Fetch and seal the best public video stream
     runs-on: ubuntu-latest
@@ -28,11 +106,9 @@ jobs:
       source_tier: ${{ steps.seal.outputs.source_tier }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
       - name: Install public-stream and media tools
         run: |
           set -euo pipefail
@@ -43,7 +119,6 @@ jobs:
           yt-dlp --version
           node --version
           ffmpeg -version | head -n 1
-
       - name: Try direct public YouTube clients
         id: direct
         continue-on-error: true
@@ -53,7 +128,6 @@ jobs:
           set -uo pipefail
           rm -rf work/video-source
           mkdir -p work/video-source/diagnostics
-
           clients=(
             ''
             'youtube:player_client=web_safari,android_vr,web_embedded'
@@ -64,54 +138,34 @@ jobs:
             'youtube:player_client=ios,android'
             'youtube:player_client=tv_embedded,web_creator'
           )
-
           selected=''
           for index in "${!clients[@]}"; do
             args=()
-            if [ -n "${clients[$index]}" ]; then
-              args+=(--extractor-args "${clients[$index]}")
-            fi
+            if [ -n "${clients[$index]}" ]; then args+=(--extractor-args "${clients[$index]}"); fi
             log="work/video-source/diagnostics/direct-${index}.log"
             echo "DIRECT_ATTEMPT=$index CLIENTS=${clients[$index]:-default}" | tee "$log"
-            yt-dlp \
-              --verbose --no-playlist --js-runtimes node \
+            yt-dlp --verbose --no-playlist --js-runtimes node \
               --remote-components ejs:github "${args[@]}" \
               --format 'bv*+ba/b' --merge-output-format mkv \
               --write-info-json --write-description --write-thumbnail \
               --write-subs --write-auto-subs --sub-langs 'all,-live_chat' \
-              --output 'work/video-source/video.%(ext)s' \
-              "$VIDEO_URL" 2>&1 | tee -a "$log"
-            rc=${PIPESTATUS[0]}
-            echo "RETURN_CODE=$rc" >> "$log"
-            if [ "$rc" -eq 0 ]; then
-              selected="${clients[$index]}"
-              printf '%s' "$selected" > work/video-source/SELECTED-EXTRACTOR-ARGS.txt
-              break
-            fi
+              --output 'work/video-source/video.%(ext)s' "$VIDEO_URL" 2>&1 | tee -a "$log"
+            rc=${PIPESTATUS[0]}; echo "RETURN_CODE=$rc" >> "$log"
+            if [ "$rc" -eq 0 ]; then selected="${clients[$index]}"; printf '%s' "$selected" > work/video-source/SELECTED-EXTRACTOR-ARGS.txt; break; fi
           done
-
-          curl -fsSL \
-            "https://www.youtube.com/oembed?url=${VIDEO_URL}&format=json" \
-            -o work/video-source/diagnostics/oembed.json \
-            2> work/video-source/diagnostics/oembed.log
+          curl -fsSL "https://www.youtube.com/oembed?url=${VIDEO_URL}&format=json" \
+            -o work/video-source/diagnostics/oembed.json 2> work/video-source/diagnostics/oembed.log
           echo "OEMBED_RETURN_CODE=$?" >> work/video-source/diagnostics/oembed.log
-
           mapfile -t videos < <(find work/video-source -maxdepth 1 -type f \
-            \( -name 'video.mkv' -o -name 'video.mp4' -o -name 'video.webm' -o -name 'video.mov' \) \
-            | sort)
+            \( -name 'video.mkv' -o -name 'video.mp4' -o -name 'video.webm' -o -name 'video.mov' \) | sort)
           if [ "${#videos[@]}" -eq 1 ]; then
             printf '%s\n' "${videos[0]}" > work/video-source/VIDEO-PATH.txt
-            # yt-dlp names the sidecar after the selected extension.
             info="$(find work/video-source -maxdepth 1 -type f -name 'video.info.json' | head -n 1)"
-            test -n "$info"
-            cp "$info" work/video-source/video.metadata.json
+            test -n "$info"; cp "$info" work/video-source/video.metadata.json
             printf 'YOUTUBE_BEST_PUBLIC_STREAM' > work/video-source/SOURCE-TIER.txt
-            echo "DIRECT_PUBLIC_STREAM=PASS CLIENTS=${selected:-default}"
-            exit 0
+            echo "DIRECT_PUBLIC_STREAM=PASS CLIENTS=${selected:-default}"; exit 0
           fi
-          echo 'DIRECT_PUBLIC_STREAM=HELD_BOT_GATE'
-          exit 1
-
+          echo 'DIRECT_PUBLIC_STREAM=HELD_BOT_GATE'; exit 1
       - name: Try public Invidious and Piped relays
         id: relay
         if: steps.direct.outcome != 'success'
@@ -119,39 +173,28 @@ jobs:
         run: |
           set -euo pipefail
           python tools/video-flashlight/fetch_public_mirror.py \
-            --video-id "$VIDEO_ID" \
-            --output-dir work/video-source | tee work/video-source/diagnostics/public-relay.log
+            --video-id "$VIDEO_ID" --output-dir work/video-source \
+            | tee work/video-source/diagnostics/public-relay.log
           test -f work/video-source/video.mkv
           test -f work/video-source/video.metadata.json
           printf '%s\n' work/video-source/video.mkv > work/video-source/VIDEO-PATH.txt
           printf 'PUBLIC_THIRD_PARTY_RELAY_OF_YOUTUBE' > work/video-source/SOURCE-TIER.txt
-
       - name: Probe and seal source identity
         id: seal
         if: steps.direct.outcome == 'success' || steps.relay.outcome == 'success'
         run: |
           set -euo pipefail
-          video="$(cat work/video-source/VIDEO-PATH.txt)"
-          tier="$(cat work/video-source/SOURCE-TIER.txt)"
-          ffprobe -v error -show_format -show_streams -print_format json "$video" \
-            > work/video-source/video.ffprobe.json
-          relay_args=()
-          if [ -f work/video-source/PUBLIC-RELAY-RECEIPT.json ]; then
-            relay_args+=(--relay-receipt work/video-source/PUBLIC-RELAY-RECEIPT.json)
-          fi
+          video="$(cat work/video-source/VIDEO-PATH.txt)"; tier="$(cat work/video-source/SOURCE-TIER.txt)"
+          ffprobe -v error -show_format -show_streams -print_format json "$video" > work/video-source/video.ffprobe.json
+          relay_args=(); if [ -f work/video-source/PUBLIC-RELAY-RECEIPT.json ]; then relay_args+=(--relay-receipt work/video-source/PUBLIC-RELAY-RECEIPT.json); fi
           python tools/video-flashlight/prepare_source.py \
-            --video "$video" \
-            --metadata work/video-source/video.metadata.json \
-            --ffprobe work/video-source/video.ffprobe.json \
-            --video-id "$VIDEO_ID" \
-            --cube-count 27 \
-            --source-tier "$tier" \
-            "${relay_args[@]}" \
+            --video "$video" --metadata work/video-source/video.metadata.json \
+            --ffprobe work/video-source/video.ffprobe.json --video-id "$VIDEO_ID" \
+            --cube-count 27 --source-tier "$tier" "${relay_args[@]}" \
             --output work/video-source/receipt | tee work/video-source/ingest.log
           (cd work/video-source/receipt && sha256sum -c SHA256SUMS)
           grep -q 'camera_raw=0' work/video-source/ingest.log
           grep -q 'coverage=FULL_TIMELINE' work/video-source/ingest.log
-
       - name: Upload source package or complete diagnostic record
         if: always()
         uses: actions/upload-artifact@v4
@@ -181,7 +224,6 @@ jobs:
             work/video-source/diagnostics/**
             work/video-source/ingest.log
             work/video-source/receipt/**
-
       - name: Enforce public-source acquisition gate
         if: always()
         run: |
@@ -189,19 +231,118 @@ jobs:
           test -f work/video-source/receipt/SOURCE-RECEIPT.json
           test -f work/video-source/VIDEO-PATH.txt
           test -f work/video-source/SOURCE-TIER.txt
-
       - name: Job summary
         if: success()
         run: |
           cat >> "$GITHUB_STEP_SUMMARY" <<EOF
           # Video source sealed
-
           - Video ID: \`${VIDEO_ID}\`
           - Source tier: \`${{ steps.seal.outputs.source_tier }}\`
           - Original camera raw: \`false\`
           - SHA-256: \`${{ steps.seal.outputs.video_sha256 }}\`
           - Duration: \`${{ steps.seal.outputs.duration_s }} s\`
           - Temporal cubes: \`27\`
-
-          The bytes are a best available public video stream. They are not asserted to be the original camera memory-card file.
           EOF
+
+  cube:
+    name: cube ${{ matrix.cube_id }} — 64/256/1024/4096 × 800
+    needs: [source, selftest]
+    if: needs.source.result == 'success' && needs.selftest.result == 'success'
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix: ${{ fromJson(needs.source.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install analysis dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'numpy==2.4.4' opencv-python-headless zstandard tokenizers
+      - uses: actions/download-artifact@v4
+        with:
+          name: video-source-jmKlNBD4HGo
+          path: work/source
+      - name: Locate and verify source package
+        run: |
+          set -euo pipefail
+          video="$(find work/source -type f \( -name 'video.mkv' -o -name 'video.mp4' -o -name 'video.webm' -o -name 'video.mov' \) | head -n 1)"
+          receipt="$(find work/source -type f -path '*/receipt/SOURCE-RECEIPT.json' | head -n 1)"
+          test -n "$video"; test -n "$receipt"
+          printf '%s\n' "$video" > work/VIDEO-PATH.txt
+          printf '%s\n' "$receipt" > work/RECEIPT-PATH.txt
+      - name: Scan every frame and build the cube
+        env:
+          PYTHONPATH: tools/video-flashlight
+        run: |
+          set -euo pipefail
+          out="work/cube-${{ matrix.cube_id }}"; mkdir -p "$out"
+          python tools/video-flashlight/analyze_video_cube.py \
+            --video "$(cat work/VIDEO-PATH.txt)" \
+            --source-receipt "$(cat work/RECEIPT-PATH.txt)" \
+            --cube-id '${{ matrix.cube_id }}' \
+            --start-s '${{ matrix.start_s }}' --end-s '${{ matrix.end_s }}' \
+            --max-samples 96 --passes 800 --output "$out" | tee "$out/run.log"
+          (cd "$out" && sha256sum -c SHA256SUMS)
+          python - "$out/CUBE-RESULT.json" <<'PY'
+          import json,sys
+          r=json.load(open(sys.argv[1])); assert r['hypercube']['restore']; assert r['frames_decoded']>0
+          assert len(r['hypercube']['transitions'])==3
+          assert all(x['opportunities']==800 for x in r['hypercube']['transitions'])
+          print('VIDEO_CUBE_GATE=PASS')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: video-cube-${{ matrix.cube_id }}
+          retention-days: 30
+          if-no-files-found: error
+          path: work/cube-${{ matrix.cube_id }}/**
+
+  aggregate:
+    name: Ω aggregate — 27 cubes and super-hypercube
+    needs: [source, cube]
+    if: always() && needs.source.result == 'success' && needs.cube.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install aggregation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'numpy==2.4.4' zstandard tokenizers
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: video-cube-*
+          path: work/cubes
+          merge-multiple: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: video-source-jmKlNBD4HGo
+          path: work/source
+      - name: Verify timeline and mint Ω(video)
+        env:
+          PYTHONPATH: tools/video-flashlight
+        run: |
+          set -euo pipefail
+          receipt="$(find work/source -type f -path '*/receipt/SOURCE-RECEIPT.json' | head -n 1)"
+          test -n "$receipt"
+          python tools/video-flashlight/aggregate_video_cubes.py \
+            --input work/cubes --source-receipt "$receipt" \
+            --passes 800 --output work/video-omega | tee work/video-omega/run.log
+          (cd work/video-omega && sha256sum -c SHA256SUMS)
+          grep -q 'status=PASS' work/video-omega/run.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: video-omega-jmKlNBD4HGo
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            work/video-omega/**
+            artifacts/video-jmKlNBD4HGo/INGEST-SPEC.md
