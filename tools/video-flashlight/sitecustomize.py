@@ -2,22 +2,24 @@
 
 OpenCV's HoughLinesP result is represented as ``(N, 1, 4)`` on some builds and
 ``(N, 4)`` on others. The original analyzer assumed only ``(N, 1, 4)``. Normalize
-both forms without changing the measured feature definition.
+both forms when analysis dependencies exist; source-acquisition jobs intentionally
+run without OpenCV and must remain silent.
 """
 from __future__ import annotations
 
-import math
-
-import cv2
-import numpy as np
-
 try:
+    import math
+    import cv2
+    import numpy as np
     import video_features
-except Exception:  # pragma: no cover - only relevant before analysis deps exist
+except ModuleNotFoundError:
+    math = None
+    cv2 = None
+    np = None
     video_features = None
 
 
-def _line_features(gray: np.ndarray) -> list[dict]:
+def _line_features(gray):
     edges = cv2.Canny(gray, 60, 160)
     minimum_length = max(12, min(gray.shape) // 12)
     detected = cv2.HoughLinesP(
@@ -28,7 +30,7 @@ def _line_features(gray: np.ndarray) -> list[dict]:
         minLineLength=minimum_length,
         maxLineGap=8,
     )
-    output: list[dict] = []
+    output = []
     if detected is None:
         return output
     height, width = gray.shape
