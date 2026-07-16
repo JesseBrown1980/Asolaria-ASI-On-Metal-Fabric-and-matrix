@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Seal a downloaded public video stream and divide its full timeline into 27 cubes."""
+"""Seal an acquired public video derivative and divide its full timeline into 27 cubes."""
 from __future__ import annotations
 
 import argparse
@@ -8,6 +8,32 @@ import json
 import os
 from pathlib import Path
 from typing import Any
+
+
+SOURCE_TIERS = {
+    "YOUTUBE_BEST_PUBLIC_STREAM": (
+        "Highest-quality stream publicly served by YouTube to the downloader; not asserted "
+        "to be the uploader's original camera file."
+    ),
+    "PUBLIC_THIRD_PARTY_RELAY_OF_YOUTUBE": (
+        "Public third-party relay of the YouTube video after direct public YouTube clients "
+        "were bot-gated; not asserted byte-identical to YouTube's best direct stream or to "
+        "the uploader's original camera file."
+    ),
+    "PUBLIC_EMBED_NETWORK_STREAM": (
+        "Public media bytes observed and downloaded from an unauthenticated guest embed "
+        "player; not asserted to be the uploader's original camera file."
+    ),
+    "PUBLIC_EMBED_PLAYBACK_CAPTURE": (
+        "Full-timeline screen capture of the unauthenticated public embed player after direct "
+        "stream APIs were unavailable; contains an additional browser-capture generation and "
+        "is not the uploader's original camera file."
+    ),
+    "OPERATOR_SUPPLIED_MEDIA": (
+        "Media supplied by the operator through an explicit direct-file intake. Original-camera "
+        "status is not independently proven unless separately attested and source-hashed."
+    ),
+}
 
 
 def sha256_file(path: Path, block_size: int = 8 * 1024 * 1024) -> str:
@@ -52,9 +78,11 @@ def main() -> None:
     parser.add_argument("--cube-count", type=int, default=27)
     parser.add_argument(
         "--source-tier",
-        choices=["YOUTUBE_BEST_PUBLIC_STREAM", "PUBLIC_THIRD_PARTY_RELAY_OF_YOUTUBE"],
+        choices=sorted(SOURCE_TIERS),
         default="YOUTUBE_BEST_PUBLIC_STREAM",
     )
+    parser.add_argument("--derivation-receipt")
+    # Backward-compatible alias used by the relay lane.
     parser.add_argument("--relay-receipt")
     args = parser.parse_args()
 
@@ -66,9 +94,11 @@ def main() -> None:
 
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     ffprobe = json.loads(ffprobe_path.read_text(encoding="utf-8"))
-    relay_receipt = None
-    if args.relay_receipt:
-        relay_receipt = json.loads(Path(args.relay_receipt).read_text(encoding="utf-8"))
+    receipt_path_value = args.derivation_receipt or args.relay_receipt
+    derivation_receipt = None
+    receipt_path = Path(receipt_path_value).resolve() if receipt_path_value else None
+    if receipt_path:
+        derivation_receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
     video_stream = find_video_stream(ffprobe)
     format_info = ffprobe.get("format", {})
 
@@ -104,26 +134,14 @@ def main() -> None:
             }
         )
 
-    if args.source_tier == "YOUTUBE_BEST_PUBLIC_STREAM":
-        claim_boundary = (
-            "Highest-quality stream publicly served by YouTube to the downloader; "
-            "not asserted to be the uploader's original camera file."
-        )
-    else:
-        claim_boundary = (
-            "Public third-party relay of the YouTube video after direct public YouTube "
-            "clients were bot-gated; not asserted byte-identical to YouTube's best direct "
-            "stream or to the uploader's original camera file."
-        )
-
     receipt = {
-        "schema": "ASOLARIA-VIDEO-SOURCE-RECEIPT-v1",
+        "schema": "ASOLARIA-VIDEO-SOURCE-RECEIPT-v2",
         "video_id": args.video_id,
         "source_url": metadata.get("webpage_url")
         or f"https://www.youtube.com/watch?v={args.video_id}",
         "source_tier": args.source_tier,
         "original_camera_raw": False,
-        "claim_boundary": claim_boundary,
+        "claim_boundary": SOURCE_TIERS[args.source_tier],
         "downloaded_filename": video.name,
         "source_bytes": source_bytes,
         "source_sha256": video_sha,
@@ -149,10 +167,8 @@ def main() -> None:
         "format": metadata.get("format"),
         "relay_family": metadata.get("relay_family"),
         "relay_instance": metadata.get("relay_instance"),
-        "relay_receipt_sha256": (
-            sha256_file(Path(args.relay_receipt)) if args.relay_receipt else None
-        ),
-        "relay_receipt": relay_receipt,
+        "derivation_receipt_sha256": sha256_file(receipt_path) if receipt_path else None,
+        "derivation_receipt": derivation_receipt,
         "cube_count": cube_count,
         "coverage_start_s": 0.0,
         "coverage_end_s": duration,
@@ -168,7 +184,7 @@ def main() -> None:
         json.dumps(receipt, indent=2, ensure_ascii=False), encoding="utf-8"
     )
     (output / "SOURCE-RECEIPT.hbp").write_text(
-        "VIDEOSOURCEv1"
+        "VIDEOSOURCEv2"
         f"|video_id={args.video_id}|tier={args.source_tier}|camera_raw=0"
         f"|bytes={source_bytes}|sha256={video_sha}|duration_s={duration:.9f}"
         f"|width={receipt['width']}|height={receipt['height']}|fps={receipt['fps']}"
