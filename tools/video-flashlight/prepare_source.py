@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import math
 import os
 from pathlib import Path
 from typing import Any
@@ -51,6 +50,12 @@ def main() -> None:
     parser.add_argument("--output", required=True)
     parser.add_argument("--video-id", default="jmKlNBD4HGo")
     parser.add_argument("--cube-count", type=int, default=27)
+    parser.add_argument(
+        "--source-tier",
+        choices=["YOUTUBE_BEST_PUBLIC_STREAM", "PUBLIC_THIRD_PARTY_RELAY_OF_YOUTUBE"],
+        default="YOUTUBE_BEST_PUBLIC_STREAM",
+    )
+    parser.add_argument("--relay-receipt")
     args = parser.parse_args()
 
     video = Path(args.video).resolve()
@@ -61,6 +66,9 @@ def main() -> None:
 
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     ffprobe = json.loads(ffprobe_path.read_text(encoding="utf-8"))
+    relay_receipt = None
+    if args.relay_receipt:
+        relay_receipt = json.loads(Path(args.relay_receipt).read_text(encoding="utf-8"))
     video_stream = find_video_stream(ffprobe)
     format_info = ffprobe.get("format", {})
 
@@ -96,17 +104,26 @@ def main() -> None:
             }
         )
 
+    if args.source_tier == "YOUTUBE_BEST_PUBLIC_STREAM":
+        claim_boundary = (
+            "Highest-quality stream publicly served by YouTube to the downloader; "
+            "not asserted to be the uploader's original camera file."
+        )
+    else:
+        claim_boundary = (
+            "Public third-party relay of the YouTube video after direct public YouTube "
+            "clients were bot-gated; not asserted byte-identical to YouTube's best direct "
+            "stream or to the uploader's original camera file."
+        )
+
     receipt = {
         "schema": "ASOLARIA-VIDEO-SOURCE-RECEIPT-v1",
         "video_id": args.video_id,
         "source_url": metadata.get("webpage_url")
         or f"https://www.youtube.com/watch?v={args.video_id}",
-        "source_tier": "YOUTUBE_BEST_PUBLIC_STREAM",
+        "source_tier": args.source_tier,
         "original_camera_raw": False,
-        "claim_boundary": (
-            "Highest-quality stream publicly served by YouTube to the downloader; "
-            "not asserted to be the uploader's original camera file."
-        ),
+        "claim_boundary": claim_boundary,
         "downloaded_filename": video.name,
         "source_bytes": source_bytes,
         "source_sha256": video_sha,
@@ -128,8 +145,14 @@ def main() -> None:
         "pixel_format": video_stream.get("pix_fmt"),
         "container": format_info.get("format_name"),
         "container_duration_s": as_float(format_info.get("duration")),
-        "yt_dlp_format_id": metadata.get("format_id"),
-        "yt_dlp_format": metadata.get("format"),
+        "format_id": metadata.get("format_id"),
+        "format": metadata.get("format"),
+        "relay_family": metadata.get("relay_family"),
+        "relay_instance": metadata.get("relay_instance"),
+        "relay_receipt_sha256": (
+            sha256_file(Path(args.relay_receipt)) if args.relay_receipt else None
+        ),
+        "relay_receipt": relay_receipt,
         "cube_count": cube_count,
         "coverage_start_s": 0.0,
         "coverage_end_s": duration,
@@ -146,7 +169,7 @@ def main() -> None:
     )
     (output / "SOURCE-RECEIPT.hbp").write_text(
         "VIDEOSOURCEv1"
-        f"|video_id={args.video_id}|tier=YOUTUBE_BEST_PUBLIC_STREAM|camera_raw=0"
+        f"|video_id={args.video_id}|tier={args.source_tier}|camera_raw=0"
         f"|bytes={source_bytes}|sha256={video_sha}|duration_s={duration:.9f}"
         f"|width={receipt['width']}|height={receipt['height']}|fps={receipt['fps']}"
         f"|cubes={cube_count}|receipt_sha256={receipt['receipt_sha256']}|json=0\n",
@@ -177,10 +200,11 @@ def main() -> None:
             handle.write(f"video_sha256={video_sha}\n")
             handle.write(f"duration_s={duration:.9f}\n")
             handle.write(f"source_filename={video.name}\n")
+            handle.write(f"source_tier={args.source_tier}\n")
 
     print(
         "VIDEOSOURCE|"
-        f"video_id={args.video_id}|tier=YOUTUBE_BEST_PUBLIC_STREAM|camera_raw=0|"
+        f"video_id={args.video_id}|tier={args.source_tier}|camera_raw=0|"
         f"bytes={source_bytes}|sha256={video_sha}|duration_s={duration:.9f}|"
         f"cubes={cube_count}|coverage=FULL_TIMELINE|status=PASS|json=0"
     )
