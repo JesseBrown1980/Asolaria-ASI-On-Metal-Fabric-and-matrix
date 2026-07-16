@@ -1,0 +1,312 @@
+name: Video flashlight — operator-supplied media 27 cubes × 3 floors × 800
+
+on:
+  workflow_dispatch:
+    inputs:
+      media_url:
+        description: 'Direct HTTPS media URL. Prefer repository secret VIDEO_MEDIA_URL for a private URL.'
+        required: false
+        type: string
+      expected_sha256:
+        description: 'Expected SHA-256. Prefer repository secret VIDEO_MEDIA_SHA256 for private intake.'
+        required: false
+        type: string
+      operator_claims_camera_original:
+        description: 'Operator attests this is the original camera file; recorded as an assertion, not independent proof.'
+        required: true
+        default: false
+        type: boolean
+      cube_count:
+        description: 'Contiguous temporal cubes'
+        required: true
+        default: '27'
+        type: string
+      passes_per_transition:
+        description: 'Deterministic opportunities for 64→256, 256→1024, and 1024→4096'
+        required: true
+        default: '800'
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  VIDEO_ID: jmKlNBD4HGo
+
+jobs:
+  source:
+    name: Seal operator-supplied media without relabeling provenance
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    outputs:
+      matrix: ${{ steps.seal.outputs.matrix }}
+      video_sha256: ${{ steps.seal.outputs.video_sha256 }}
+      duration_s: ${{ steps.seal.outputs.duration_s }}
+      source_filename: ${{ steps.seal.outputs.source_filename }}
+      source_tier: ${{ steps.seal.outputs.source_tier }}
+      passes: ${{ steps.contract.outputs.passes }}
+    env:
+      SECRET_MEDIA_URL: ${{ secrets.VIDEO_MEDIA_URL }}
+      INPUT_MEDIA_URL: ${{ inputs.media_url }}
+      SECRET_MEDIA_SHA256: ${{ secrets.VIDEO_MEDIA_SHA256 }}
+      INPUT_MEDIA_SHA256: ${{ inputs.expected_sha256 }}
+      CAMERA_RAW_ATTESTATION: ${{ secrets.VIDEO_CAMERA_RAW_ATTESTATION }}
+      OPERATOR_CLAIM: ${{ inputs.operator_claims_camera_original }}
+      CUBE_COUNT: ${{ inputs.cube_count }}
+      PASSES: ${{ inputs.passes_per_transition }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install media tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg jq
+          ffprobe -version | head -n 1
+
+      - name: Validate requested cube contract
+        id: contract
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          cubes=int(os.environ['CUBE_COUNT'])
+          passes=int(os.environ['PASSES'])
+          assert 1 <= cubes <= 128
+          assert 1 <= passes <= 10000
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:
+              f.write(f'passes={passes}\n')
+          print(f'OPERATORCONTRACT|cubes={cubes}|passes={passes}|status=PASS|json=0')
+          PY
+
+      - name: Download exact supplied bytes and verify source hash
+        run: |
+          set -euo pipefail
+          mkdir -p work/operator-source
+          media_url="${SECRET_MEDIA_URL:-${INPUT_MEDIA_URL:-}}"
+          expected_sha="${SECRET_MEDIA_SHA256:-${INPUT_MEDIA_SHA256:-}}"
+          test -n "$media_url" || {
+            echo 'HELD: set repository secret VIDEO_MEDIA_URL or provide workflow input media_url' >&2
+            exit 2
+          }
+          case "$media_url" in
+            https://*) ;;
+            *) echo 'HELD: direct media URL must use HTTPS' >&2; exit 2 ;;
+          esac
+
+          # The URL itself is intentionally not printed or committed.
+          curl --fail --location --retry 4 --retry-all-errors \
+            --connect-timeout 30 --max-time 3600 \
+            --output work/operator-source/operator-media.bin "$media_url"
+          test -s work/operator-source/operator-media.bin
+
+          actual_sha="$(sha256sum work/operator-source/operator-media.bin | cut -d' ' -f1)"
+          if [ -n "$expected_sha" ]; then
+            test "${expected_sha,,}" = "$actual_sha"
+          fi
+          ffprobe -v error -show_format -show_streams -print_format json \
+            work/operator-source/operator-media.bin > work/operator-source/video.ffprobe.json
+          test "$(jq '[.streams[]|select(.codec_type=="video")]|length' work/operator-source/video.ffprobe.json)" -ge 1
+          ffmpeg -hide_banner -loglevel error -i work/operator-source/operator-media.bin \
+            -frames:v 1 -f null -
+
+          MEDIA_URL="$media_url" ACTUAL_SHA="$actual_sha" EXPECTED_SHA="$expected_sha" \
+          python - <<'PY'
+          import hashlib,json,os,pathlib
+          p=pathlib.Path('work/operator-source/operator-media.bin')
+          attestation=os.environ.get('CAMERA_RAW_ATTESTATION','')
+          receipt={
+            'schema':'ASOLARIA-OPERATOR-MEDIA-INTAKE-v1',
+            'video_id':os.environ['VIDEO_ID'],
+            'source_tier':'OPERATOR_SUPPLIED_MEDIA',
+            'bytes':p.stat().st_size,
+            'sha256':os.environ['ACTUAL_SHA'],
+            'expected_sha256':os.environ.get('EXPECTED_SHA') or None,
+            'expected_sha256_match':(
+              not os.environ.get('EXPECTED_SHA') or
+              os.environ['EXPECTED_SHA'].lower()==os.environ['ACTUAL_SHA']
+            ),
+            'media_url_sha256':hashlib.sha256(os.environ['MEDIA_URL'].encode()).hexdigest(),
+            'media_url_retained':False,
+            'operator_claims_camera_original':os.environ.get('OPERATOR_CLAIM','false').lower()=='true',
+            'camera_raw_attestation_supplied':bool(attestation),
+            'camera_raw_attestation_sha256':hashlib.sha256(attestation.encode()).hexdigest() if attestation else None,
+            'camera_raw_independently_verified':False,
+            'claim_boundary':'Exact operator-supplied bytes; original-camera status remains an operator assertion unless a separate chain-of-custody receipt proves it.'
+          }
+          pathlib.Path('work/operator-source/OPERATOR-MEDIA-RECEIPT.json').write_text(json.dumps(receipt,indent=2))
+          PY
+
+      - name: Build normalized metadata without exposing the source URL
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          probe=json.load(open('work/operator-source/video.ffprobe.json'))
+          fmt=probe.get('format') or {}
+          video=next(s for s in probe.get('streams',[]) if s.get('codec_type')=='video')
+          duration=float(fmt.get('duration') or video.get('duration') or 0)
+          assert duration > 0
+          fps=video.get('avg_frame_rate') or video.get('r_frame_rate')
+          meta={
+            'id':'jmKlNBD4HGo',
+            'title':'Operator-supplied source for jmKlNBD4HGo',
+            'uploader':None,
+            'channel':None,
+            'channel_id':None,
+            'upload_date':None,
+            'timestamp':None,
+            'duration':duration,
+            'width':video.get('width'),
+            'height':video.get('height'),
+            'fps':fps,
+            'availability':'operator_supplied',
+            'format_id':'operator-supplied',
+            'format':'OPERATOR_SUPPLIED_MEDIA',
+            'webpage_url':'operator-supplied:jmKlNBD4HGo',
+            'description':''
+          }
+          json.dump(meta,open('work/operator-source/video.metadata.json','w'),indent=2)
+          PY
+
+      - name: Seal the source and divide the complete timeline
+        id: seal
+        run: |
+          set -euo pipefail
+          python tools/video-flashlight/prepare_source.py \
+            --video work/operator-source/operator-media.bin \
+            --metadata work/operator-source/video.metadata.json \
+            --ffprobe work/operator-source/video.ffprobe.json \
+            --video-id "$VIDEO_ID" \
+            --cube-count "$CUBE_COUNT" \
+            --source-tier OPERATOR_SUPPLIED_MEDIA \
+            --derivation-receipt work/operator-source/OPERATOR-MEDIA-RECEIPT.json \
+            --output work/operator-source/receipt | tee work/operator-source/ingest.log
+          (cd work/operator-source/receipt && sha256sum -c SHA256SUMS)
+          grep -q 'coverage=FULL_TIMELINE' work/operator-source/ingest.log
+          grep -q 'tier=OPERATOR_SUPPLIED_MEDIA' work/operator-source/ingest.log
+
+      - name: Upload exact source package
+        uses: actions/upload-artifact@v4
+        with:
+          name: operator-video-source-jmKlNBD4HGo
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: error
+          path: |
+            work/operator-source/operator-media.bin
+            work/operator-source/video.ffprobe.json
+            work/operator-source/video.metadata.json
+            work/operator-source/OPERATOR-MEDIA-RECEIPT.json
+            work/operator-source/ingest.log
+            work/operator-source/receipt/**
+
+  cube:
+    name: operator cube ${{ matrix.cube_id }} — 64/256/1024/4096 × ${{ needs.source.outputs.passes }}
+    needs: source
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix: ${{ fromJson(needs.source.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install analysis dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'numpy==2.4.4' opencv-python-headless zstandard tokenizers
+      - uses: actions/download-artifact@v4
+        with:
+          name: operator-video-source-jmKlNBD4HGo
+          path: work/source
+      - name: Locate exact source and receipt
+        run: |
+          set -euo pipefail
+          video="$(find work/source -type f -name operator-media.bin | head -n 1)"
+          receipt="$(find work/source -type f -path '*/receipt/SOURCE-RECEIPT.json' | head -n 1)"
+          test -n "$video"; test -n "$receipt"
+          printf '%s\n' "$video" > work/VIDEO-PATH.txt
+          printf '%s\n' "$receipt" > work/RECEIPT-PATH.txt
+      - name: Scan every frame and build the temporal cube
+        env:
+          PYTHONPATH: tools/video-flashlight
+        run: |
+          set -euo pipefail
+          out="work/cube-${{ matrix.cube_id }}"; mkdir -p "$out"
+          python tools/video-flashlight/analyze_video_cube.py \
+            --video "$(cat work/VIDEO-PATH.txt)" \
+            --source-receipt "$(cat work/RECEIPT-PATH.txt)" \
+            --cube-id '${{ matrix.cube_id }}' \
+            --start-s '${{ matrix.start_s }}' --end-s '${{ matrix.end_s }}' \
+            --max-samples 96 --passes '${{ needs.source.outputs.passes }}' \
+            --output "$out" 2>&1 | tee "$out/run.log"
+          (cd "$out" && sha256sum -c SHA256SUMS)
+          python - "$out/CUBE-RESULT.json" <<'PY'
+          import json,sys
+          r=json.load(open(sys.argv[1]))
+          assert r['hypercube']['restore']
+          assert r['frames_decoded'] > 0
+          assert len(r['hypercube']['transitions']) == 3
+          assert all(x['opportunities'] == int('${{ needs.source.outputs.passes }}') for x in r['hypercube']['transitions'])
+          print('OPERATOR_VIDEO_CUBE_GATE=PASS')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: operator-video-cube-${{ matrix.cube_id }}
+          retention-days: 30
+          if-no-files-found: error
+          path: work/cube-${{ matrix.cube_id }}/**
+
+  aggregate:
+    name: Ω(operator video) — full timeline
+    needs: [source, cube]
+    if: always() && needs.source.result == 'success' && needs.cube.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install aggregation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'numpy==2.4.4' zstandard tokenizers
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: operator-video-cube-*
+          path: work/cubes
+          merge-multiple: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: operator-video-source-jmKlNBD4HGo
+          path: work/source
+      - name: Verify full timeline and mint Ω(video)
+        env:
+          PYTHONPATH: tools/video-flashlight
+        run: |
+          set -euo pipefail
+          receipt="$(find work/source -type f -path '*/receipt/SOURCE-RECEIPT.json' | head -n 1)"
+          test -n "$receipt"
+          python tools/video-flashlight/aggregate_video_cubes.py \
+            --input work/cubes --source-receipt "$receipt" \
+            --passes '${{ needs.source.outputs.passes }}' \
+            --output work/video-omega | tee work/video-omega/run.log
+          (cd work/video-omega && sha256sum -c SHA256SUMS)
+          grep -q 'status=PASS' work/video-omega/run.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: operator-video-omega-jmKlNBD4HGo
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            work/video-omega/**
+            artifacts/video-jmKlNBD4HGo/INGEST-SPEC.md
