@@ -40,27 +40,97 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg jq
           yt-dlp --version
+          node --version
           ffmpeg -version | head -n 1
 
-      - name: Resolve public metadata
+      - name: Resolve public metadata across supported player clients
+        id: metadata
+        continue-on-error: true
         run: |
-          set -euo pipefail
+          set -uo pipefail
           rm -rf work/video-source
-          mkdir -p work/video-source
-          yt-dlp \
-            --no-playlist \
-            --remote-components ejs:github \
-            --dump-single-json \
-            "$VIDEO_URL" > work/video-source/video.metadata.json
+          mkdir -p work/video-source/diagnostics
+
+          # The public YouTube extractor surface changes over time. Try the standard
+          # client first, then several public player-client combinations. No cookies,
+          # login, DRM bypass, or private endpoint is used.
+          clients=(
+            ''
+            'youtube:player_client=web_safari,android_vr,web_embedded'
+            'youtube:player_client=tv,web_safari'
+            'youtube:player_client=android_vr'
+          )
+
+          success=0
+          selected=''
+          for index in "${!clients[@]}"; do
+            args=()
+            if [ -n "${clients[$index]}" ]; then
+              args+=(--extractor-args "${clients[$index]}")
+            fi
+            echo "METADATA_ATTEMPT=$index CLIENTS=${clients[$index]:-default}" \
+              | tee "work/video-source/diagnostics/metadata-attempt-${index}.log"
+            yt-dlp \
+              --verbose \
+              --no-playlist \
+              --js-runtimes node \
+              --remote-components ejs:github \
+              "${args[@]}" \
+              --dump-single-json \
+              "$VIDEO_URL" \
+              > work/video-source/video.metadata.candidate.json \
+              2>> "work/video-source/diagnostics/metadata-attempt-${index}.log"
+            rc=$?
+            if [ "$rc" -eq 0 ] && jq -e '.id == env.VIDEO_ID' \
+              work/video-source/video.metadata.candidate.json >/dev/null 2>&1; then
+              mv work/video-source/video.metadata.candidate.json \
+                work/video-source/video.metadata.json
+              printf '%s' "${clients[$index]}" \
+                > work/video-source/SELECTED-EXTRACTOR-ARGS.txt
+              selected="${clients[$index]}"
+              success=1
+              break
+            fi
+          done
+
+          curl -fsSL \
+            "https://www.youtube.com/oembed?url=${VIDEO_URL}&format=json" \
+            -o work/video-source/diagnostics/oembed.json \
+            2> work/video-source/diagnostics/oembed.log || true
+
+          if [ "$success" -ne 1 ]; then
+            echo 'METADATA_RESOLUTION=HELD_PUBLIC_STREAM_UNAVAILABLE'
+            echo '--- yt-dlp diagnostics ---'
+            cat work/video-source/diagnostics/metadata-attempt-*.log || true
+            echo '--- oEmbed diagnostics ---'
+            cat work/video-source/diagnostics/oembed.log || true
+            cat work/video-source/diagnostics/oembed.json || true
+            exit 1
+          fi
+
           jq '{id,title,uploader,channel,channel_id,upload_date,timestamp,duration,width,height,fps,availability,format_id,format,webpage_url,description,formats}' \
-            work/video-source/video.metadata.json > work/video-source/video.metadata.normalized.json
+            work/video-source/video.metadata.json \
+            > work/video-source/video.metadata.normalized.json
+          echo "METADATA_RESOLUTION=PASS SELECTED=${selected:-default}"
 
       - name: Download best publicly served stream without a second video encode
+        id: download
+        if: steps.metadata.outcome == 'success'
+        continue-on-error: true
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          extractor_args="$(cat work/video-source/SELECTED-EXTRACTOR-ARGS.txt)"
+          args=()
+          if [ -n "$extractor_args" ]; then
+            args+=(--extractor-args "$extractor_args")
+          fi
+
           yt-dlp \
+            --verbose \
             --no-playlist \
+            --js-runtimes node \
             --remote-components ejs:github \
+            "${args[@]}" \
             --format 'bv*+ba/b' \
             --merge-output-format mkv \
             --write-info-json \
@@ -70,7 +140,12 @@ jobs:
             --write-auto-subs \
             --sub-langs 'all,-live_chat' \
             --output 'work/video-source/video.%(ext)s' \
-            "$VIDEO_URL"
+            "$VIDEO_URL" \
+            2>&1 | tee work/video-source/diagnostics/download.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -ne 0 ]; then
+            exit "$rc"
+          fi
 
           mapfile -t videos < <(find work/video-source -maxdepth 1 -type f \
             \( -name 'video.mkv' -o -name 'video.mp4' -o -name 'video.webm' -o -name 'video.mov' \) \
@@ -80,6 +155,7 @@ jobs:
 
       - name: Probe and seal source identity
         id: seal
+        if: steps.metadata.outcome == 'success' && steps.download.outcome == 'success'
         run: |
           set -euo pipefail
           video="$(cat work/video-source/VIDEO-PATH.txt)"
@@ -97,7 +173,8 @@ jobs:
           grep -q 'camera_raw=0' work/video-source/ingest.log
           grep -q 'coverage=FULL_TIMELINE' work/video-source/ingest.log
 
-      - name: Upload the exact public-stream source package
+      - name: Upload source package or complete diagnostic record
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: video-source-jmKlNBD4HGo
@@ -120,10 +197,22 @@ jobs:
             work/video-source/video.png
             work/video-source/video.ffprobe.json
             work/video-source/VIDEO-PATH.txt
+            work/video-source/SELECTED-EXTRACTOR-ARGS.txt
+            work/video-source/diagnostics/**
             work/video-source/ingest.log
             work/video-source/receipt/**
 
+      - name: Enforce public-source acquisition gate
+        if: always()
+        run: |
+          set -euo pipefail
+          test '${{ steps.metadata.outcome }}' = 'success'
+          test '${{ steps.download.outcome }}' = 'success'
+          test -f work/video-source/receipt/SOURCE-RECEIPT.json
+          test -f work/video-source/VIDEO-PATH.txt
+
       - name: Job summary
+        if: success()
         run: |
           cat >> "$GITHUB_STEP_SUMMARY" <<EOF
           # Video source sealed
